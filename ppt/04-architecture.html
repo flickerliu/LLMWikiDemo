@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>4 · 方案架构</title>
+<link rel="stylesheet" href="assets/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+</head>
+<body>
+<section class="slide">
+  <h1>方案架构</h1>
+  <p class="sub">Azure 云原生 · 私有端点 · 托管标识 · 模型分级路由</p>
+  <div class="card" style="margin-top:10px;flex:1;overflow:auto">
+    <div class="mermaid">
+flowchart TB
+  U[👤 用户浏览器] -->|OIDC HTTPS| FD[Azure Front Door + WAF]
+  FD --> FE[Web 前端<br/>Container Apps]
+  FE --> APIM[API Management]
+  APIM --> API[Query / Wiki API<br/>Container Apps]
+  API --> SRCH[(Azure AI Search<br/>BM25 + 向量 + ACL)]
+  API --> GIT[(Wiki Store<br/>Azure DevOps Git)]
+  API --> PG[(PostgreSQL Flex<br/>元数据 / 审计)]
+  API --> AOAI[Azure OpenAI<br/>私有端点]
+
+  subgraph Ingest [摄入 Pipeline · 事件驱动]
+    GW[Graph Webhook<br/>Azure Functions] --> SB[(Service Bus Premium)]
+    SB --> JOB[Container Apps Jobs]
+    JOB --> EX[Extract / OCR<br/>Document Intelligence]
+    EX --> CLS[Classify · 小模型]
+    CLS --> SUM[Summarize · 大模型]
+    SUM --> QG[Quality Gate · Eval 模型]
+    QG --> COMMIT[Commit Git + Search + DB]
+  end
+
+  ONE[(OneDrive for Business)] -.->|Delta Query| GW
+  COMMIT --> GIT
+  COMMIT --> SRCH
+  COMMIT --> PG
+
+  subgraph Gov [治理 / Lint]
+    LINT[ACA Jobs · 定时扫描] --> NOTIF[Teams / Graph sendMail]
+  end
+  GIT --> LINT
+
+  KV[Key Vault] --- API
+  MON[Azure Monitor + App Insights] --- API
+
+  classDef sec fill:#3a1f5c,stroke:#a78bfa,color:#fff
+  classDef ops fill:#1f3a5c,stroke:#7dd3fc,color:#fff
+  class KV sec
+  class MON ops
+    </div>
+  </div>
+</section>
+<script>
+  mermaid.initialize({ startOnLoad:true, theme:'dark', themeVariables:{
+    primaryColor:'#1b2553', primaryTextColor:'#e6eaff', primaryBorderColor:'#3b4ab0',
+    lineColor:'#7c8cff', secondaryColor:'#22305c', tertiaryColor:'#0f1838', fontSize:'14px'
+  }});
+</script>
+<script src="assets/deck.js"></script>
+</body>
+</html>

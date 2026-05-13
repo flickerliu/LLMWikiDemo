@@ -1,494 +1,366 @@
-# 解决方案设计文档
-# 企业级 LLM 自维护知识库系统
+# 企业级 LLM 自维护知识库系统 —— 解决方案设计
 
-> ⚠️ **Human review needed**：以下标注 `[TBD]` 的内容涉及未确认信息（预算、时间线、团队规模、吞吐量目标、数据驻留区域及利益相关方名称），需在架构评审前由业务与技术负责人确认并填写。
-
----
-
-## 执行摘要（Executive Summary）
-
-- **问题**：企业内部知识管理依赖 Confluence/飞书/RAG 等工具，存在重复查询无积累、内容冲突、维护成本极高、知识孤岛等核心痛点，大量知识资产随人员流失而消失。
-- **解决方案**：采用 Andrej Karpathy 提出的 **LLM 自维护 Wiki 范式**，构建企业级"人类策展 + LLM 维护"三层知识库系统，以 AI 替代人工执行 90% 以上的知识整理与更新工作。
-- **方法论**：三大核心流程（Ingest 摄入 / Query 查询回写 / Lint 健康审查）驱动知识持续积累；多步骤 Pipeline 处理异构数据源；双模型质量门控保障内容准确性。
-- **技术选型**：以 **Azure** 为云平台，Azure OpenAI（GPT-4o + GPT-4o-mini）为 LLM 引擎，Azure AI Search 为混合检索层，Git-backed Markdown 为 Wiki 存储，Entra ID 管理统一身份与权限。
-- **MVP 试点**：首期聚焦**客服 FAQ** 场景，验证核心引擎后再推广至研发文档及全域知识管理。
-- **关键收益**：知识库自动更新率 ≥ 90%；用户查询准确率 ≥ 85%；新员工知识获取时间缩短 ≥ 50%；知识内容冲突率 < 5%。
-- **⚠️ Human review needed**：预算、项目时间线、团队配置、峰值吞吐量、数据驻留区域尚待确认。
+> **状态：草案 — 需人工审核（Human review needed）**
+> 本文基于 [docs/requirements.md](requirements.md) 与 [docs/Enterprise LLM Wiki System Research Report.md](Enterprise%20LLM%20Wiki%20System%20Research%20Report.md)（Karpathy LLM 自维护 Wiki 范式）撰写，遵循 `.github/prompts/solution-design.prompt.md` 输出规范。
+> 文中标注 **TBD** 或 **假设** 的项目须在架构评审前由干系人确认（详见 §12 待确认事项）。
 
 ---
 
-## 1. 背景（Background）
+## 1. 执行摘要（Executive Summary）
 
-### 1.1 业务背景
-
-企业知识资产分散于多套系统，现有知识管理方案面临结构性失败：
-
-| 痛点 | 根因 |
-|------|------|
-| **重复查询无积累** | RAG 无状态，每次从头检索，知识无复利效应 |
-| **矛盾与不一致** | 多文档冲突时 RAG 给出自相矛盾的答案，可信度低 |
-| **维护负担极重** | 文档越积越多，交叉引用全靠人工，Confluence/Notion 沦为"知识坟场" |
-| **知识孤岛** | 知识散落在代码仓库、飞书/Slack、邮件、Jira 等多套系统，缺乏统一整合层 |
-| **人工成本倒挂** | 知识增长价值赶不上维护成本，人员放弃维护，知识资产持续流失 |
-
-### 1.2 技术背景：LLM 自维护 Wiki 范式
-
-Andrej Karpathy（2026年）提出 **LLM 自维护知识库（LLM Self-Maintaining Wiki）** 新范式：以 LLM 替代人持续编写和维护结构化 Wiki 知识库，将每次交互变为知识库建设机会。
-
-**与传统 RAG 的本质差异**：
-
-| 维度 | 传统 RAG | LLM 自维护 Wiki |
-|------|----------|-----------------|
-| 知识状态 | 无状态，每次重新检索 | 有状态，知识持续积累 |
-| 综合时机 | 查询时实时综合 | 摄入时预综合 |
-| 矛盾处理 | 每次可能产生不同答案 | 摄入时标注矛盾，一次解决 |
-| 交叉引用 | 无自动链接 | 自动维护全局双向链接 |
-| 知识质量 | 文档越多噪声越多，质量下降 | 文档越多，知识覆盖提升 |
-| 探索价值 | 答案用完即弃，无积累 | 有价值问答回馈 Wiki，知识持续演化 |
+- 构建一套基于 Microsoft Azure 的企业内部 Web 应用，作为组织"企业大脑（Company Brain）"，将 OneDrive for Business 中散落的文档持续编译为结构化、交叉链接、低矛盾的 LLM 自维护 Wiki。
+- 架构对齐 Karpathy 三层模型：**原始素材层（OneDrive 镜像/索引） → Wiki 知识库层（版本化 Markdown） → Schema/治理层（AGENTS.md 风格规则）**，由 LLM Agent 驱动 *摄入 / 查询 / Lint* 三大工作流。
+- 关键技术选择：**Azure Container Apps** 承载 Web/API 与 Pipeline Worker、**Service Bus** 解耦事件驱动摄入、**Azure AI Search** 提供 BM25+向量混合检索、**Azure OpenAI（私有端点）** 分级模型路由（≥70% 走小模型）、**Azure DevOps Repos（Git）** 作为 Wiki 版本化后端、**PostgreSQL Flex** 存储元数据与审计、**Microsoft Entra ID + 委托 Graph 权限** 实现端到端身份与查询时权限过滤（Permission Trimming）。
+- 安全与合规优先：私有端点 + 区域锁定 + 托管标识 + Key Vault + 敏感度标签感知过滤；月度 Token 熔断器与小模型路由约束 LLM 成本。
+- 路线图：**MVP（≤500 用户试点）≈6 个月** → **5,000 用户全量 ≈12 个月**；多项 TBD（区域、预算、Wiki 后端正式批准）须先行确认。
 
 ---
 
-## 2. 目标（Objective）
+## 2. 背景（Background）
 
-构建企业级 **LLM 自维护知识库（LLM Self-Maintaining Wiki）系统**，实现：
-
-- **知识自动积累**：LLM 持续编写和维护结构化 Wiki，每次交互均可增益知识库，实现知识复利。
-- **维护成本近零**：LLM 自动完成 ≥ 90% 知识整理更新，人工仅需战略性审查关键内容。
-- **知识质量提升**：知识库始终保持最新、一致；LLM 自动消除陈旧/冲突内容。
-- **全员提效**：员工信息搜索时间大幅减少，新员工上手加速，全员生产力提升。
-- **组织敏捷性**：知识沉淀在系统而非个人，随企业演进实时更新。
-
-### 成功衡量标准
-
-| 指标 | 目标值 |
-|------|--------|
-| 知识库自动更新率 | ≥ 90%（人工介入 < 10%） |
-| 新员工知识获取时间 | 较基线缩短 ≥ 50% |
-| 知识查询准确率 | ≥ 85%（人工抽查） |
-| 知识内容冲突率 | < 5% |
-| 月度 API 调用成本 | ⚠️ [TBD — 控制在预算内，待预算确认后设定具体目标] |
+- 企业知识散落于 OneDrive、邮件、Teams、Office 文档中；传统 RAG 每次从头检索，无跨文档持久记忆，无"知识复利"。
+- 人工 Confluence/Wiki 维护成本远超产出，最终沦为"知识坟场"；多文档矛盾导致问答不一致；个人知识孤岛在人员流动时形成断层。
+- 受影响群体：约 **5,000 名知识工作者**、新员工、业务负责人、合规/风险团队。
+- 现状：OneDrive for Business 是事实文档存储；Microsoft Entra ID 已联邦化；M365 + Graph API 可用；员工正以未受治理方式个人化使用消费级 GenAI。
+- 机遇：采用 Karpathy "LLM 自维护 Wiki" 范式，让每次交互沉淀为可复用知识，而非一次性检索。
 
 ---
 
-## 3. 范围（Scope）
+## 3. 目标（Objective）
 
-### 3.1 In Scope（本次建设范围）
+承接需求 §2，量化目标如下：
 
-- **LLM Wiki 核心引擎**：Ingest（知识摄入）、Query（智能查询）、Lint（健康检查）三大核心流程
-- **三层架构建设**：
-  - 原始素材层（Raw Sources）：多源数据接入与预处理 Pipeline
-  - Wiki 知识库层：LLM 维护的结构化 Markdown 知识库（Git 版本管理）
-  - Schema/配置层：AGENTS.md 规则、目录结构、命名规范等治理配置
-- **数据源接入**：飞书、Confluence、GitHub、企业邮件等现有知识系统
-- **混合检索层**：向量索引 + 知识图谱 + 结构化全文搜索
-- **质量门控机制**：自动校验、双模型审查（写入模型 + 评估模型）、人工审核工作流
-- **多用户协作支持**：权限管控（RBAC）、审稿流程、审计日志
-- **治理与安全**：数据分类、访问控制（Entra ID SSO）、版本审计、合规机制
-- **管理界面**：Wiki 可视化浏览、知识健康仪表盘、人工审核操作台
-- **MVP 试点范围**：客服 FAQ 场景（首期验证）
-
-### 3.2 Out of Scope（不在范围内）
-
-- 替换或迁移现有 Confluence/Notion/飞书等协作平台本身
-- 面向外部客户的公开知识库建设
-- 企业 HR/OA 系统的直接改造
-- 通用大模型训练或微调（使用现有大模型 API）
-- 实时流式数据处理（如生产监控日志的实时摄入）
-- 个人笔记/个人知识管理工具
-- 代码自动生成或代码审查功能（仅限知识管理场景）
+- 内部知识查询**平均响应时间较现有内网/RAG 缩短 ≥ 50%**。
+- **≥ 90%** 日常 Wiki 维护（摘要、交叉链接、矛盾标记、时效检查）由 LLM Agent 自动完成。
+- Wiki 与 OneDrive 源文档的**事实一致性 ≥ 95%**（抽样审计）。
+- 首年覆盖 **5,000 名活跃用户**，每用户最多 **1,000 个**源文件（合计约 **500 万**份）。
+- 通过 Entra ID + 区域锁定服务落实身份管控、访问控制、可审计性与数据驻留。
 
 ---
 
-## 4. 现状（Current State）
+## 4. 范围（Scope）
 
-### 4.1 现有知识管理体系
+**范围内：**
 
-| 系统 | 现状 | 核心痛点 |
-|------|------|----------|
-| **Confluence / Notion / 飞书文档** | 内容更新频率低，大量页面过时 | 难以维护交叉引用，信息可信度低 |
-| **飞书群组 / Slack** | 知识分散于对话流，无法沉淀 | 信息难以检索，重要决策随消息淹没 |
-| **GitHub / GitLab** | 技术文档与代码脱节 | README 普遍过时，知识与实现不同步 |
-| **现有 RAG 方案** | 部分团队使用向量数据库 + 检索生成 | 无状态、文档冲突时回答不一致、噪声随文档增多 |
-
-### 4.2 现状结论
-
-- 人工整理成本高，知识利用率低
-- 重要经验随人员流失而消失
-- 缺乏统一知识整合层，知识孤岛严重
+- Web 前端（浏览/搜索/问答/引用/历史/页面所有权）。
+- 身份与访问管理（Entra ID OIDC、SSO、MFA、条件访问、RBAC）。
+- 数据摄入（Microsoft Graph 委托权限接入 OneDrive；docx/xlsx/pptx/PDF/Markdown/纯文本/图片 OCR）。
+- LLM 编排层（Ingest / Query / Lint 工作流）。
+- Wiki 知识库（结构化 Markdown，含双向链接、版本控制、元数据：负责人/时效/来源/敏感度/置信度）。
+- 检索层（BM25 + 向量 + 图谱遍历，按用户权限过滤）。
+- 治理模块（所有权、敏感更新审批、审计日志、矛盾/时效报告、Schema 配置）。
+- 运营支撑（遥测、监控、告警、LLM 成本管控）。
 
 ---
 
-## 5. 目标架构（Target State）
+## 5. 不在范围内（Out of Scope）
 
-### 5.1 整体架构模式
+- 面向外部客户的公开访问；非 OneDrive 连接器（SharePoint 站点、Confluence、Jira、Slack、GitHub、邮件）。
+- 回写或修改 OneDrive 源文件（系统对源只读）。
+- 原生移动端应用；Wiki 实时多人协同编辑；手动创作（二期）。
+- 基础模型微调或企业数据训练；多语言翻译/跨语言综合。
+- 替代 OneDrive、HR、ERP 作为记录来源（系统是派生层）。
+- 使用非 Microsoft / 非 Azure 托管的 LLM 端点。
+
+---
+
+## 6. 假设（Assumptions）
+
+- Entra ID 租户已联邦化，目标用户可 SSO；M365 许可证可访问 Graph/OneDrive。
+- 所选 Azure 区域内 Azure OpenAI 容量配额可申请获批。
+- 用户接受**最终一致性**：源文件变更在数分钟到数小时内反映到 Wiki。
+- 人工审核人员可参与敏感/低置信度 Wiki 变更审批。
+- Wiki 内容均派生自请求用户已有权访问的源文件——系统**执行**而非**扩大**现有 OneDrive 权限。
+- 稳态 Wiki 规模 5 万–20 万页；源文件平均 ≤ 数 MB，超大或专有二进制文件降级为元数据索引。
+- 无气隙（Air-gapped）部署需求；Azure → Graph、Azure OpenAI 网络连通正常。
+
+---
+
+## 7. 约束条件（Constraints）
+
+- **云**：仅限 Azure；**身份**：仅 Entra ID（OIDC/OAuth 2.0）；**LLM**：仅 Azure OpenAI / Azure AI Foundry 托管模型，禁用消费级端点。
+- **OneDrive 接入**：默认**委托权限**，保留每用户 ACL；如需应用级权限须信安审批。
+- **数据驻留**：企业数据、Embedding、LLM Prompt/Response 日志须保留在批准的 Azure 地理区域（**TBD**）。
+- **规模**：5,000 命名用户 / 500 万源文件，预留扩展至 10,000 用户。
+- **预算**：云 + LLM 月度上限（**TBD**）；强制成本管控（小模型路由、批量 Embedding、缓存、熔断器）。
+- **时间线**：MVP ≈6 个月、全量 ≈12 个月（**具体日期 TBD**）。
+- **合规**：GDPR 等价数据保护、内部数据分级、审计要求。
+
+---
+
+## 8. 当前状态（Current State）
+
+- OneDrive 为事实文档存储；内网门户搜索精准度低、结果陈旧。
+- 个人化使用消费级 GenAI 工具，无治理、无企业数据落地、回答不一致。
+- 无机器维护的结构化知识层；部落知识散落于聊天与个人文件夹。
+- Entra ID 已就绪；M365/Graph 可用。
+
+---
+
+## 9. 目标状态（Target State）
+
+云原生分层架构（与 Karpathy 模型对齐）：
+
+1. **原始素材层**：Graph 委托权限只读镜像/索引 OneDrive；增量刷新（Delta Query + 变更通知）；源文件保留在 OneDrive，本系统仅存提取文本、元数据、Embedding。
+2. **Wiki 知识库层**：版本化 Markdown 页面（主题/实体/索引/FAQ），双向链接，含元数据。
+3. **Schema/治理层**：AGENTS.md 风格规则（分类体系、命名规范、敏感规则、审批策略），约束 LLM 行为。
+
+---
+
+## 10. 方案设计（Proposed Solution）
+
+### 10.1 架构总览
+
+逻辑视图（自上而下）：
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     用户 / Agent 接入层                   │
-│        (问答 UI / REST API / 飞书机器人 / Slack Bot)      │
-└─────────────────────┬───────────────────────────────────┘
-                       │ Query
-┌─────────────────────▼───────────────────────────────────┐
-│                   Wiki 知识库层（核心）                    │
-│  结构化 Markdown 集合：主题页、实体词条、索引              │
-│  LLM 全权创建维护 | 双向链接 | Git 版本管理 | 人工可审阅   │
-│  存储：Azure DevOps Git / GitHub Enterprise              │
-├─────────────────────────────────────────────────────────┤
-│        混合检索层：Azure AI Search（向量 + 全文 + 图谱）  │
-└──────┬──────────────────────────────────────────────────┘
-       │ Ingest / Lint
-┌──────▼──────────────────────────────────────────────────┐
-│                   原始素材层（只读）                       │
-│  飞书/Slack 会话 | GitHub | Confluence | 邮件           │
-│  PDF/Word 文档 | Jira/项目管理 | 行业报告                 │
-└─────────────────────────────────────────────────────────┘
-       │
-┌──────▼──────────────────────────────────────────────────┐
-│              Schema / 配置层（人类定义）                   │
-│  AGENTS.md：目录规范 | 命名规范 | 治理规则 | 工作流配置    │
-└─────────────────────────────────────────────────────────┘
+[ 用户浏览器 ]
+        │  HTTPS (OIDC via Entra ID)
+        ▼
+[ Azure Front Door + WAF ]
+        ▼
+[ Web Frontend (Container Apps) ]──┐
+        │                            │
+        ▼                            │
+[ API Gateway (APIM) ]               │
+        ▼                            │
+[ Query / Wiki API (Container Apps) ]│
+        │                            │
+        ├──► [ Azure AI Search ] (BM25 + 向量 + ACL 过滤)
+        ├──► [ Wiki Store: Azure DevOps Repos (Git) ]
+        ├──► [ Metadata DB: PostgreSQL Flex ]
+        └──► [ Azure OpenAI (Private Endpoint) ]
+                         ▲
+                         │
+[ Ingestion Pipeline ]   │
+  Graph Webhook (Functions)
+  → Service Bus
+  → Container Apps Jobs (Workers)
+      ├─ Extract / OCR (Document Intelligence)
+      ├─ Classify / Route (small model)
+      ├─ Summarize / Integrate (large model)
+      ├─ Quality Gate (eval model)
+      └─ Commit → Git + Search Index + Metadata DB
+
+[ 治理 / Lint 调度作业 (Container Apps Jobs) ]
+[ 通知 (Graph sendMail / Teams) ]
+[ 可观测性: Azure Monitor + App Insights + OTel ]
+[ 密钥: Key Vault + Managed Identity ]
 ```
 
-### 5.2 核心工作流
+### 10.2 组件 → Azure 服务映射
 
-| 流程 | 描述 | 触发方式 |
-|------|------|----------|
-| **Ingest（摄入）** | 新文档进入时，LLM 通读全文，生成摘要页，更新相关知识页（10–15 页/次），标记矛盾，记录更新日志 | 事件驱动（新文档推送）+ 定时批量 |
-| **Query（查询）** | 用户提问 → LLM 搜索 Wiki → 综合作答 → 有价值答案回写 Wiki，知识持续生长 | 用户实时触发 |
-| **Lint（审查）** | 定期扫描知识库，发现冲突/过时/遗漏链接，触发更新或人工审核通知 | 定时任务（每日/每周） |
+| 组件 | Azure 服务 | 选型理由 |
+|------|-----------|---------|
+| 边缘接入 / WAF | Azure Front Door (Premium) | 全球加速、WAF、私有源（Private Link 至 Container Apps） |
+| API 网关 | Azure API Management | 统一鉴权、限流、版本、配额、审计 |
+| Web 前端 / API | Azure Container Apps | 容器化、自动伸缩、KEDA；运维成本低于 AKS，规模充足 |
+| 摄入 Worker | Container Apps **Jobs** + Service Bus 触发 | 长任务、可重试、按队列长度伸缩 |
+| Graph 变更 Webhook 接收 | Azure Functions（HTTP） | 弹性、低成本、与 Service Bus 集成 |
+| 消息总线 | Azure Service Bus（Premium） | 解耦摄入、死信队列、会话保序 |
+| 检索 | Azure AI Search（标准+） | BM25+向量混合、可过滤字段、安全过滤器 |
+| LLM 推理 | Azure OpenAI（私有端点）；备选 Azure AI Foundry | 区域锁定、企业 SLA、模型分级 |
+| 文档提取 / OCR | Azure AI Document Intelligence | 处理 PDF / 扫描件 / 复杂表格 |
+| Wiki 后端 | **Azure DevOps Repos（Git）**（**假设**，待批） | 原生版本控制、PR 审批、diff/blame、与人工审核工作流契合 |
+| 元数据 / 审计 | Azure Database for PostgreSQL Flex | 关系模型适合元数据、所有权、审批状态、审计；HA 可用 |
+| 对象存储 | Azure Blob Storage（ZRS） | 提取文本、OCR 输出、中间产物 |
+| 身份 | Microsoft Entra ID + MSAL | OIDC / 委托 Graph / 条件访问 / MFA |
+| 密钥 | Azure Key Vault + Managed Identity | 无源码密钥；服务间用托管标识 |
+| 可观测性 | Azure Monitor + Application Insights + Log Analytics | 结构化日志、分布式追踪、告警 |
+| IaC / 策略 | Bicep + Azure Policy | 区域锁定、私有端点强制、SKU 守护 |
+| CI/CD | GitHub Actions（**假设**） | 与代码托管对齐；OIDC 联邦至 Azure |
 
----
+### 10.3 关键工作流
 
-## 6. 解决方案设计（Proposed Solution）
+#### 10.3.1 摄入（Ingest）Pipeline
 
-### 6.1 技术架构总览
+1. **变更感知**：Microsoft Graph `subscriptions` Webhook → Azure Functions 接收；定时 Delta Query 兜底。
+2. **入队**：每文件事件投递到 Service Bus（按 driveId 分区，幂等键 = `driveItemId@etag`）。
+3. **多阶段处理**（Container Apps Jobs）：
+   - **扫描**：取 driveItem 元数据；尺寸/类型过滤。
+   - **提取**：原生解析 Office/Markdown；PDF/图片走 Document Intelligence OCR。
+   - **分类（小模型）**：判定主题、实体、是否值得纳入 Wiki、目标页面。
+   - **综合（大模型）**：生成/更新 Wiki 页面 Markdown、双向链接、来源引用。
+   - **质量门控（评估模型）**：事实一致性、矛盾检测、置信度评分；低置信或敏感 → 人工审批队列。
+   - **提交**：写入 Wiki Git 仓库（PR 或直接 commit）+ 更新 AI Search 索引 + 写元数据/审计 DB。
+4. **失败/重试**：指数退避；最终失败入死信，告警值班。
+5. **指标**：摄入延迟、Token 用量、按阶段成功率、Graph 限流计数。
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                         前端 / 接入层                              │
-│  Next.js (Azure Static Web Apps)  |  飞书 / Slack Bot Webhook    │
-└──────────────────────┬───────────────────────────────────────────┘
-                        │ HTTPS / REST
-┌──────────────────────▼───────────────────────────────────────────┐
-│                    后端 API 层 (FastAPI)                           │
-│               Azure Container Apps  |  Entra ID 认证              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
-│  │  Query API   │  │  Ingest API  │  │  Admin / Review API  │   │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘   │
-└─────────┼─────────────────┼─────────────────────┼───────────────┘
-          │                 │                       │
-┌─────────▼─────────────────▼───────────────────────▼──────────────┐
-│                        核心服务层                                   │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐  │
-│  │  LLM Orchestr.  │  │  Pipeline Svc   │  │  Lint Scheduler  │  │
-│  │  (LangChain /   │  │  (Azure Service │  │  (Azure Func /   │  │
-│  │   Semantic K.)  │  │   Bus Queue)    │  │   Timer Trigger) │  │
-│  └────────┬────────┘  └────────┬────────┘  └────────┬─────────┘  │
-└───────────┼────────────────────┼─────────────────────┼────────────┘
-            │                    │                      │
-┌───────────▼────────────────────▼──────────────────────▼───────────┐
-│                          数据 / 存储层                               │
-│  ┌────────────────┐  ┌────────────────┐  ┌─────────────────────┐  │
-│  │ Azure OpenAI   │  │ Azure AI Search│  │  Git Repo (Wiki MD) │  │
-│  │ GPT-4o / mini  │  │ 向量+全文+图谱 │  │  Azure DevOps / GHE │  │
-│  └────────────────┘  └────────────────┘  └─────────────────────┘  │
-│  ┌────────────────┐  ┌────────────────┐  ┌─────────────────────┐  │
-│  │ Azure Doc Intel│  │  Azure Blob    │  │  Azure Monitor /    │  │
-│  │ (OCR / Parse)  │  │ (Raw 文件存储) │  │  App Insights       │  │
-│  └────────────────┘  └────────────────┘  └─────────────────────┘  │
-└────────────────────────────────────────────────────────────────────┘
-```
+#### 10.3.2 查询 / 问答（Query）Pipeline
 
-### 6.2 技术栈选型
+1. 用户在 Web 端发起问题；前端附带 Entra Access Token 调 API。
+2. API 解析用户身份，拉取 Entra 组成员（缓存）。
+3. 构造检索：AI Search 混合查询（BM25 + 向量），使用 `search.in(aclGroupSids, '<user groups>')` **查询时权限过滤**；附加 Wiki 图谱遍历扩展上下文。
+4. 组装受限上下文 → 调用 Azure OpenAI 大模型生成答案，**强制引用** Wiki 页面与源文档链接；流式回传。
+5. 记录 Prompt 哈希、模型版本、来源、Token、用户 ID（审计 12+ 个月）。
+6. 失败降级：LLM 不可用 → 退化为 Wiki 检索结果列表。
 
-| 层级 | 组件 | 选型 | 说明 |
-|------|------|------|------|
-| **前端** | Web UI | Next.js on Azure Static Web Apps | Wiki 浏览、问答界面、审核台 |
-| **后端 API** | REST 服务 | FastAPI on Azure Container Apps | 无状态、水平扩展 |
-| **LLM 引擎（复杂推理）** | 大模型 | Azure OpenAI GPT-4o | Ingest 摘要生成、Wiki 写入、Lint |
-| **LLM 引擎（简单任务）** | 轻量模型 | Azure OpenAI GPT-4o-mini | 分类、过滤、摘要评分，降低成本 |
-| **向量 + 混合检索** | 搜索引擎 | Azure AI Search | 向量索引 + BM25 全文 + 语义重排序 |
-| **Wiki 存储** | 版本化 Markdown | Azure DevOps Git / GitHub Enterprise | Git 原生版本管理，支持 PR 审核 |
-| **原始素材存储** | 对象存储 | Azure Blob Storage | 只读原始文件归档，审计回溯 |
-| **异步消息队列** | Pipeline 解耦 | Azure Service Bus | Ingest/Lint 任务异步分发，断点续跑 |
-| **文档处理 / OCR** | 非结构化解析 | Azure Document Intelligence | PDF / Word / 图片内容提取 |
-| **定时任务** | Lint 调度 | Azure Functions（Timer Trigger） | 每日/每周健康检查调度 |
-| **身份认证** | SSO + RBAC | Microsoft Entra ID | 企业 SSO，细粒度角色权限 |
-| **可观测性** | 日志/追踪/告警 | Azure Monitor + Application Insights | LLM 调用追踪、知识库健康告警 |
-| **编排框架** | LLM 工具调用 | LangChain / Semantic Kernel | Wiki 工具（read/search/write/delete） |
+#### 10.3.3 Lint / 治理 Pipeline
 
-### 6.3 多步处理 Pipeline
+- **定时作业**（每日/每周）扫描全量或抽样 Wiki：
+  - 与最新源文档比对 → 检测过时 / 矛盾。
+  - 时效元数据更新；冲突报告写入页面或推送给负责人。
+  - 对 AGENTS.md 规则违规（命名、分类、敏感）打标。
+- 通知通过 Graph `sendMail` 或 Teams 消息推送给 Owner / 审批人。
+- 敏感更新走审批工作流（PR + 多人 Reviewer + 审计记录）。
 
-```
-原始数据扫描（API 拉取 / 文件上传）
-        │
-        ▼
-规则筛选（过滤无效/重复文件，预计过滤 60–75% 噪声）
-        │
-        ▼
-格式转换（OCR / 文本提取 — Azure Document Intelligence）
-        │
-        ▼
-LLM 分类 & 摘要（GPT-4o-mini 批量处理，低成本）
-        │
-        ▼
-质量门控校验（双模型评分 + 自动拒绝不达标内容）
-        │
-        ▼
-Wiki 组装写入（GPT-4o 生成/更新 Markdown 页面，提交 Git PR）
-        │
-        ▼
-双向链接更新（自动建立/修复跨页面引用关系）
-        │
-        ▼
-索引同步（Azure AI Search 增量更新向量/全文索引）
+### 10.4 数据模型
+
+**Wiki 页面 Front Matter（YAML）**：
+
+```yaml
+id: <stable-uuid>
+title: <string>
+owners: ["upn or group SID"]
+sources:
+  - driveItemId: <id>
+    etag: <etag>
+    aclGroupSids: ["..."]
+    lastSeen: <iso8601>
+sensitivity: Public | Internal | Confidential | Restricted
+freshness:
+  lastReviewed: <iso8601>
+  nextReviewDue: <iso8601>
+confidence: 0.0-1.0
+modelVersion: <azure-openai-deployment@version>
+promptHash: <sha256>
+links:
+  out: ["page-id-..."]
+  in:  ["page-id-..."]
 ```
 
-**Pipeline 设计原则**：
-- **幂等性**：重复运行不产生重复写入，保障安全重试
-- **断点续跑**：任务失败后从检查点恢复，而非重头开始
-- **成本分层**：简单任务（分类、过滤）优先规则/小模型；复杂推理（摘要、Wiki 写入）才调用 GPT-4o
+**AI Search 索引字段（节选）**：`pageId`、`chunkId`、`text`、`vector`、`aclGroupSids (Collection<string>, filterable)`、`sensitivity`、`pageOwners`、`lastUpdated`、`sourceDriveItemIds`。
 
-### 6.4 质量门控机制（Quality Gate）
+**PostgreSQL 表**：`pages`、`page_versions`、`approvals`、`ingest_jobs`、`audit_events`、`cost_meter_daily`。
 
-```
-LLM 写入候选页面
-        │
-        ▼
-评估模型审查（GPT-4o-mini 独立评分：准确性 / 一致性 / 覆盖度）
-        │
-        ├── 高分（≥ 阈值）→ 自动合并至 Wiki Git 主干
-        │
-        ├── 中分 → 标注"待审核"，进入人工审核队列
-        │
-        └── 低分 → 拒绝写入，记录失败原因，通知 Pipeline 重试
-```
+### 10.5 安全与身份
 
-**关键内容强制人工审核**（如法律法规、安全政策、客服标准答案）。
+- **认证**：所有用户走 Entra ID OIDC；前端 PKCE，API 受 OAuth 2.0 Bearer 保护；继承租户 MFA 与条件访问。
+- **授权**：
+  - **应用层 RBAC**：Wiki Admin / Editor / Approver / Reader（映射 Entra 组）。
+  - **来源权限过滤**：摄入时记录每分块的源文件 ACL（组 SID 集合）；查询时按用户组过滤，确保派生内容不超出原始访问范围。
+- **服务到服务**：全部使用 **Managed Identity**；无连接字符串/密钥落码。
+- **网络**：Azure OpenAI、AI Search、PostgreSQL、Blob、Key Vault 一律 **Private Endpoint**；公网仅 Front Door；出站经 NAT/Firewall。
+- **密钥**：Key Vault 集中存储；轮换策略；CI/CD 通过 OIDC 联邦无密钥部署。
+- **敏感数据**：尊重 M365 敏感度标签；Restricted 文档默认排除或走专属审批；可配置脱敏（PII 检测）。
+- **传输/静态**：TLS 1.2+；存储默认平台密钥；如合规要求可启用 **CMK（TBD）**。
+- **审计**：所有 LLM 编辑、用户查询、权限变更进 Log Analytics，保留 ≥ 12 个月，支持导出。
 
-### 6.5 数据源连接器
+### 10.6 可靠性与扩展
 
-| 数据源 | 接入方式 | 频率 |
-|--------|----------|------|
-| **飞书文档 / 群消息** | 飞书开放平台 API + Webhook | 实时推送 + 每日全量同步 |
-| **Confluence** | Confluence REST API | 每日增量拉取 |
-| **GitHub / Azure DevOps** | Webhooks（PR merge / Commit） | 事件驱动 |
-| **企业邮件** | Exchange / Graph API（只读） | 每日批量摘要 |
-| **PDF / Word 文档** | Azure Blob Storage 上传触发 | 上传即触发 |
-| **Jira / 项目管理** | Jira REST API | 每日增量 |
+- 全部计算无状态；Container Apps + Functions 自动伸缩。
+- 摄入 Pipeline **幂等 + 可断点续跑**（按 `driveItemId@etag` 去重）；Service Bus 死信兜底。
+- 多副本 + 区域内可用区冗余（PostgreSQL HA、Storage ZRS、Service Bus Premium）。
+- **DR**：跨区域被动备份（PostgreSQL Geo-Backup、Git 仓库镜像、Search 索引可重建）；**RTO ≤ 4 h、RPO ≤ 1 h**；源文件可由 OneDrive 重新索引。
+- Graph 限流：客户端配额 + 指数退避 + 429/503 重试；按 driveId 并发上限。
+- 灰度发布：Container Apps revision 流量切分；Front Door 路由切换。
 
-### 6.6 管理界面功能
+### 10.7 可观测性与成本治理
 
-| 模块 | 功能 |
-|------|------|
-| **Wiki 浏览器** | 分类浏览、全文搜索、版本历史查看、原文溯源链接 |
-| **知识健康仪表盘** | 更新率、冲突数、过时页面数、LLM 调用成本趋势 |
-| **人工审核操作台** | 待审核变更列表、diff 视图、批准/拒绝/修改操作 |
-| **数据源管理** | 连接器配置、同步状态、错误日志 |
-| **权限管理** | 用户角色分配、知识域权限设置 |
+- **遥测**：OpenTelemetry SDK → App Insights；结构化日志含 `requestId / userId / pageId / promptHash / tokenIn / tokenOut / modelDeployment`。
+- **仪表板**：摄入延迟、查询 P50/P95、LLM Token 与费用（按租户/团队/模型）、错误率、Graph 限流。
+- **告警**：摄入积压、P95 超阈、错误率突增、Token 日预算超 80%、Key Vault 即将过期。
+- **成本护栏**：
+  - **模型分级**：≥70% Pipeline 步骤走小模型（如 gpt-4o-mini 级）；大模型仅用于综合与最终问答。
+  - **Embedding 缓存** + 批量调用；提取文本去重哈希。
+  - **租户级月度 Token 上限 + 熔断器**：超阈自动停摄入、降级问答。
+  - 每日 `cost_meter_daily` 滚动统计 + 周报。
 
----
+### 10.8 部署与环境
 
-## 7. 关键设计原则（Key Design Principles）
-
-1. **人类策展 + LLM 维护**：人类定义"放入什么知识"和治理规则；LLM 负责知识的编写、更新、关联和冲突消解。
-2. **知识复利**：每次 Ingest 和 Query 均沉淀为可复用的 Wiki 页面，避免重复计算。
-3. **质量优先**：宁可减少自动化覆盖，也不降低内容准确性；关键内容强制人工审核。
-4. **成本分层的 LLM 调用**：复杂推理用 GPT-4o，简单任务用 GPT-4o-mini 或规则处理，目标大模型调用比例 < 30% 总处理量。
-5. **安全默认（Secure-by-default）**：RBAC + TLS 1.2+ + Entra ID SSO 为基础；敏感数据分类标记，访问受限。
-6. **模块化与可扩展**：连接器、检索引擎、LLM 编排框架均可独立替换，支持从 MVP 平滑扩展至全域知识管理。
+- **环境**：Dev / Test / Prod 三套订阅（或资源组隔离），通过 Bicep 参数化部署。
+- **IaC**：Bicep 模块；Azure Policy 强制（区域白名单、私有端点必启、公网拒绝、SKU 守护、Diagnostic Settings 必配）。
+- **CI/CD**：GitHub Actions（**假设**）；分支 → Dev 自动、Test 手动审批、Prod PR + 双人审批；OIDC 联邦至 Azure 无密钥。
+- **配置管理**：App Configuration + Key Vault 引用；功能开关用于 Pipeline 阶段灰度。
 
 ---
 
-## 8. 假设条件（Assumptions）
+## 11. 关键设计原则（Key Design Principles）
 
-> ⚠️ **Human review needed**：以下假设需业务/技术负责人在项目启动前确认。
-
-1. Azure OpenAI 服务已获得企业合规许可，并签署数据处理协议（DPA）。
-2. 企业现有飞书、Confluence、GitHub 等系统均有可用 API 或导出接口，可批量提取数据。
-3. Wiki 知识库采用 Markdown 格式存储，版本管理基于 Git（Azure DevOps 或 GitHub Enterprise）。
-4. 人类管理员负责定义和维护 Schema/AGENTS.md 配置文件，并在项目启动时完成初始化。
-5. 重要知识更新需经人工审核（Quality Gate），非完全自动化。
-6. **MVP 试点域为客服 FAQ**，核心引擎验证通过后再推广至研发文档及全域场景。
-7. 多数原始素材为中文内容，Azure OpenAI 支持中文处理能力满足需求。
-8. 企业具备将部分知识维护工作交由 AI 自动处理的业务意愿，并有相应变更管理支持。
-9. ⚠️ [TBD] 数据驻留区域（是否要求数据留存中国大陆，如需则须使用 Azure 中国区—世纪互联部署，架构需相应调整）。
+- 安全默认开启（Private Endpoint / Managed Identity / 最小权限）。
+- Wiki 是**派生层**，OneDrive 是**事实来源**。
+- 权限**继承而非扩张**：永不扩大用户访问范围。
+- 模型分级 + 成本护栏从第一天起内建。
+- 可观测性、审计、Schema/治理皆以代码（IaC + Policy + AGENTS.md）管理。
+- 模块化、松耦合、幂等、可替换（模型/检索/存储抽象）。
+- 透明可追溯：每条答案/每页内容都有可点击来源引用。
 
 ---
 
-## 9. 约束条件（Constraints）
+## 12. 依赖（Dependencies）
 
-| 类别 | 约束 | 说明 |
-|------|------|------|
-| **技术栈** | Azure 优先 | 使用 Azure OpenAI、Azure AI Search、Container Apps 等托管服务 |
-| **LLM 模型** | 合规优先 | 使用 Azure OpenAI（商业条款合规），避免敏感数据外传至不合规 API |
-| **数据驻留** | ⚠️ [TBD] | 优先国内合规区域；若要求中国大陆数据不出境，需切换至 Azure 中国区（世纪互联） |
-| **预算** | ⚠️ [TBD] | API 调用成本需精细化控制；LLM 调用分层优化，大模型仅用于复杂推理 |
-| **时间线** | ⚠️ [TBD] | 建议分三阶段：核心引擎 MVP → 企业接入 → 全面治理（具体里程碑待确认） |
-| **团队规模** | ⚠️ [TBD] | 待确认；建议最小团队：1 架构师 + 2 后端 + 1 前端 + 1 数据工程师 + 1 产品 |
-| **现有系统集成** | 不中断现有工作流 | 连接器只读原始系统 API，不修改现有系统数据，不影响现有用户使用 |
-| **监管合规** | 审计日志留存 | 所有 LLM 写入操作需留存审计日志；合规要求 TBD（需信息安全团队确认） |
+- Azure OpenAI 在目标区域的容量配额获批。
+- Microsoft Graph API 配额、Webhook 订阅生命周期管理。
+- Entra ID 应用注册 + 委托权限管理员同意（`Files.Read.All` 委托、`User.Read`、`Sites.Read.All` 等）。
+- 敏感度标签分类体系与脱敏规则定义（信安/合规）。
+- 审批组与负责人组织映射（HR/AD）。
+- 私有 DNS 区域、Hub-Spoke 网络、Azure Firewall（如适用）。
+- IT Ops / SOC 接入告警与值班流程。
 
 ---
 
-## 10. 依赖项（Dependencies）
+## 13. 风险与缓解（Risks & Mitigations）
 
-| 依赖 | 类型 | 负责方 | 风险 |
-|------|------|--------|------|
-| Azure OpenAI 服务配额（GPT-4o / mini） | 外部服务 | 云平台团队 | 配额不足将阻塞 Ingest Pipeline |
-| 飞书开放平台 API 权限申请 | 外部集成 | IT / 飞书管理员 | 审批周期可能影响 MVP 进度 |
-| Confluence REST API 访问 | 外部集成 | IT 团队 | 需确认 API 版本兼容性 |
-| GitHub / Azure DevOps Webhook 配置 | 外部集成 | 研发团队 | 组织级权限审批 |
-| Entra ID 应用注册与 SSO 配置 | 内部基础设施 | 信息安全/IT | 涉及安全评审，需提前启动 |
-| AGENTS.md Schema 初始化 | 业务规则定义 | 知识管理负责人 | 未完成则 LLM 无法遵循目录规范 |
-| 数据分类标准定义 | 治理规则 | 数据治理团队 | 影响权限管控和合规机制设计 |
-| 客服 FAQ 初始语料提供 | MVP 数据 | 客服/运营团队 | MVP 的知识质量基线依赖初始语料质量 |
-
----
-
-## 11. 风险与缓解措施（Risks and Mitigations）
-
-| 风险 | 概率 | 影响 | 缓解措施 |
-|------|------|------|----------|
-| **LLM 幻觉/归纳错误**：LLM 臆造知识或错误关联 | 中 | 高 | 双模型质量门控；关键页面强制人工审核；原文溯源引用；定期人工抽样校验 |
-| **成本失控**：大规模 Ingest 时 API 调用费用超预算 | 中 | 高 | 成本分层（GPT-4o-mini 处理简单任务）；规则过滤前置（预计减少 60–75% LLM 调用）；设置每日 API 调用告警阈值 |
-| **数据隐私泄露**：企业机密通过 LLM API 外传 | 低 | 极高 | 使用 Azure OpenAI（数据不用于训练）；Azure Private Endpoint 隔离网络；数据分类标记，敏感数据不进入 LLM |
-| **知识失真**：LLM 摘要遗漏细节，原始信息损失 | 中 | 中 | 保留只读原始素材层用于审计回溯；Wiki 页面保留原文引用链接；摘要质量评估模型打分 |
-| **外部系统集成失败**：飞书/Confluence API 变更或不可用 | 低 | 中 | 连接器设计为可插拔模块；API 失败时降级为手动上传；设置集成健康监控告警 |
-| **组织采用阻力**：员工不信任 AI 生成内容，拒绝使用 | 中 | 中 | MVP 阶段优先人工审核所有内容建立信任；增加原文溯源透明度；通过客服 FAQ 场景快速展示价值 |
-| **数据驻留合规风险**：敏感数据跨境传输违规** | ⚠️ [TBD] | 极高 | 确认监管要求后，按需切换 Azure 中国区（世纪互联）部署；数据分类管控出境 |
+| 风险 | 设计缓解 |
+|------|---------|
+| LLM 幻觉 / 知识失真 | 评估模型质量门控；强制来源引用；敏感页人工审批；定期抽样审计；置信度阈值路由 |
+| 权限泄露（综合页跨 ACL 暴露） | 摄入时记录每分块 ACL；AI Search `search.in()` 查询时过滤；红队测试；权限审计仪表板 |
+| 敏感数据泄漏至 LLM | Azure OpenAI 私有端点；敏感度标签感知排除；PII 脱敏；禁用未批准模型端点（Azure Policy 强制） |
+| LLM 成本超支 | 小模型路由 ≥70%；批量 Embedding + 缓存；租户月度上限 + 熔断器；每日成本监控告警 |
+| Graph API 限流 / 摄入瓶颈 | Delta Query 增量；指数退避；按 driveId 并发上限；Service Bus 缓冲 + 死信 + 重试 |
+| Wiki 陈旧/矛盾 | Lint 定时作业；时效元数据；冲突报告推送 Owner；源引用便于核查 |
+| OneDrive 内容异构 | 多阶段提取器；Document Intelligence OCR；明确"无法处理"状态；元数据降级索引 |
+| 用户采纳风险 | 透明引用；时效徽章；试点先行；"人工审核通过"标记 |
+| 厂商/模型版本依赖 | 模型提供商抽象层；容量预留；监控弃用；备用分级模型 |
+| 区域 / 数据驻留违规 | 私有端点 + 区域锁定 + Azure Policy as Code + 定期合规扫描 |
+| 运营复杂度上升 | 各服务 SLO + Runbook；统一可观测性；灰度发布 |
+| Schema / 治理漂移 | AGENTS.md 版本化 + Pipeline 强制 Lint 规则 + 治理评审节奏 |
 
 ---
 
-## 12. 安全与合规（Security and Compliance）
+## 14. 验收标准（Validation Criteria）
 
-- **身份认证**：Entra ID SSO（OAuth 2.0 / OIDC），统一企业身份，不支持匿名访问。
-- **授权**：基于角色的细粒度权限（RBAC）：普通用户（只读）/ 内容审核员（读写审核）/ 管理员（全权管理）/ 系统服务账号（仅限 API）。
-- **传输安全**：TLS 1.2+ 全链路加密；内部服务间通信通过 Azure Virtual Network 隔离。
-- **LLM 数据安全**：使用 Azure OpenAI（承诺数据不用于模型训练）；通过 Azure Private Endpoint 访问，流量不经公网。
-- **敏感数据控制**：数据分类标签（公开 / 内部 / 机密）；机密数据不进入 LLM 处理流程。
-- **审计日志**：所有 Wiki 写入/删除操作记录操作者、时间戳、LLM 生成来源；日志留存 ≥ 90 天（具体合规周期待信息安全团队确认）。
-- **漏洞管理**：容器镜像定期扫描（Azure Defender for Containers）；依赖库漏洞自动检测。
-- **⚠️ [TBD]** 具体合规要求（等保级别、数据不出境认证等）需信息安全团队评审确认。
-
----
-
-## 13. 非功能性需求（NFR）
-
-| 类别 | 需求 | 目标值 |
-|------|------|--------|
-| **可用性** | 系统正常运行时间 SLA | ≥ 99.5% |
-| **延迟** | 用户查询 P99 响应时间 | < 5 秒 |
-| **延迟** | Ingest 单文档处理时间 | < 60 秒 |
-| **吞吐量** | 峰值并发查询请求 | ⚠️ [TBD] |
-| **扩展性** | 支持知识源数量 | 初期 ≤ 10,000 篇；可扩展至 100,000+ |
-| **扩展性** | 最大并发用户数 | ⚠️ [TBD] |
-| **安全** | 认证机制 | 企业 SSO / OAuth 2.0（Entra ID） |
-| **安全** | 数据传输加密 | TLS 1.2+ |
-| **安全** | 访问控制 | 基于角色的细粒度权限（RBAC） |
-| **灾难恢复** | RTO | < 4 小时 |
-| **灾难恢复** | RPO | < 1 小时（Wiki Git 版本回滚） |
-| **可观测性** | 日志/追踪/告警 | 完整操作日志；LLM 调用追踪；知识库健康告警 |
-| **知识质量** | Wiki 内容准确率 | ≥ 85%（定期抽样人工校验） |
-| **成本效率** | 大模型 API 调用比例 | 复杂任务 < 30%；简单任务优先规则/小模型 |
+- **性能**：负载测试达成 500 并发用户、问答持续 20 QPS / 突发 50 QPS；P95 检索 < 1.5 s、首 Token < 3 s。
+- **摄入**：选取 ≥10 万文件子集做端到端干跑，验证 P95 增量 ≤ 1 小时。
+- **安全**：权限过滤红队测试 0 越权；Azure Policy 合规 100%；私有端点全覆盖。
+- **质量**：抽样 ≥200 个 Wiki 页与源文档比对，事实一致性 ≥ 95%；幻觉率审计基线建立。
+- **成本**：基于干跑外推月度 Token 费用 ≤ 批准上限；熔断器触发演练通过。
+- **DR**：完成一次故障切换演练，RTO ≤ 4 h、RPO ≤ 1 h。
+- **无障碍**：WCAG 2.1 AA 自动 + 人工评估通过。
+- **审计**：日志可查询、保留期合规；至少一次外部安全评审通过。
 
 ---
 
-## 14. 验证标准（Validation Criteria）
+## 15. 后续步骤（Next Steps）
 
-### MVP 阶段（客服 FAQ 试点）
-
-- [ ] 客服 FAQ 知识库自动更新率 ≥ 90%，人工编辑介入 < 10% 的页面更新
-- [ ] 客服查询响应 P99 延迟 < 5 秒
-- [ ] 随机抽取 20 条 FAQ 答案，人工核验准确率 ≥ 85%
-- [ ] 知识冲突页面比例 < 5%（Lint 扫描结果）
-- [ ] 所有 Wiki 写入操作均有审计日志
-- [ ] 人工审核工作流可正常操作（批准/拒绝/修改）
-
-### 全域推广阶段
-
-- [ ] 新员工入职知识获取时间较基线缩短 ≥ 50%（问卷调查）
-- [ ] 飞书、Confluence、GitHub 三大数据源连接器正常运行，同步成功率 ≥ 99%
-- [ ] 系统可用性 ≥ 99.5%（连续 3 个月统计）
-- [ ] 灾难恢复演练：RTO < 4 小时，RPO < 1 小时
-- [ ] 月度 API 调用成本在预算范围内（⚠️ [TBD — 预算确认后设定具体验收值]）
+1. 干系人确认 §16 全部 TBD（区域、预算、Wiki 后端、敏感度分类、CMK 要求、审批组）。
+2. 输出关键 ADR：Wiki 后端（Git vs DB）、模型分级与提供商抽象、网络拓扑、元数据库选型。
+3. 准备 MVP 待办（≤500 用户试点，≈6 个月）：Entra 应用注册、Graph 订阅原型、单业务单元摄入、最小问答闭环。
+4. 信安评审 + DPIA（数据保护影响评估）。
+5. Bicep 脚手架与 Landing Zone 接入；CI/CD 流水线建立。
+6. 容量与配额申请：Azure OpenAI 部署、Service Bus Premium、AI Search 标准+。
 
 ---
 
-## 15. 分阶段实施计划（Next Steps）
+## 16. 待确认事项（Clarifying Questions）
 
-### Phase 1 — 核心引擎 MVP（客服 FAQ 试点）
+> 以下事项阻塞最终设计与评审决策，请在架构评审前确认。
 
-**目标**：验证 Ingest → Quality Gate → Wiki Write → Query 核心链路可行性
-
-| 任务 | 说明 |
-|------|------|
-| 基础设施搭建 | Azure OpenAI、Azure AI Search、Azure Container Apps、Entra ID 配置 |
-| AGENTS.md Schema 定义 | 与知识管理负责人共同定义客服 FAQ 目录规范 |
-| Ingest Pipeline 开发 | 支持手动上传 + 飞书文档拉取；GPT-4o-mini 分类 + GPT-4o Wiki 写入 |
-| 质量门控实现 | 双模型评分 + 人工审核操作台 |
-| Query 流程开发 | 问答界面 + 有价值问答回写 Wiki |
-| MVP 验收测试 | 基于验证标准对客服 FAQ 场景进行评估 |
-
-**里程碑**：⚠️ [TBD — 具体日期待项目计划确认]
-
----
-
-### Phase 2 — 企业接入扩展
-
-**目标**：接入全部数据源连接器，支持研发文档等更多业务域
-
-| 任务 | 说明 |
-|------|------|
-| 连接器开发 | Confluence、GitHub、邮件、Jira 连接器 |
-| Lint 调度服务 | Azure Functions 定时健康检查 |
-| RBAC 精细化 | 多部门权限策略配置 |
-| 混合检索优化 | 知识图谱关系建模、查询精排序优化 |
-| 多业务域 Wiki 扩展 | 研发文档、决策记录等场景接入 |
+1. **Azure 目标区域**：合同/合规批准的区域是哪个（如 `Sweden Central` / `East US 2` / `Japan East`）？是否要求多区域？
+2. **月度预算上限**：云 + LLM 合并稳态月度上限金额？是否按业务单元分摊？
+3. **Wiki 后端选型批准**：是否同意采用 Azure DevOps Repos（Git）作为 Wiki 版本化存储？或要求 Cosmos DB / 其他？
+4. **元数据库选型批准**：PostgreSQL Flex 是否符合企业 DBA 标准？或要求 Azure SQL / Cosmos DB？
+5. **CI/CD 平台**：GitHub Actions 还是 Azure DevOps Pipelines？
+6. **CMK（客户托管密钥）**：是否强制要求 Storage / PostgreSQL / Search 启用 CMK？
+7. **敏感度标签分类与脱敏规则**：M365 现有标签清单与处理矩阵（哪些禁送 LLM、哪些需脱敏）？
+8. **审批组定义**：敏感/低置信度 Wiki 变更的审批人/组如何映射到 Entra 组？SLA 是多少？
+9. **OneDrive 接入权限模型**：确认采用委托权限；如需部分应用级权限（例如离线 Lint）须信安审批范围。
+10. **时间线节点**：MVP 上线日期与全量推广日期的具体目标。
+11. **团队组成**：后端 / 前端 / AI / DevOps / 安全 / PM 头数与外部顾问安排。
+12. **试点业务单元**：首批 ≤500 用户来自哪个业务单元？文档形态是否典型？
+13. **审计日志保留**：12 个月是否满足合规？是否需要 WORM/不可变存储？
+14. **通知渠道**：Owner/审批通知优先 Teams 还是邮件？是否需要 Webhook 至 ITSM？
 
 ---
 
-### Phase 3 — 全面治理与推广
-
-**目标**：全组织推广，建立完整治理体系
-
-| 任务 | 说明 |
-|------|------|
-| 治理体系建设 | 数据分类体系、内容 Owner 机制、合规审查流程 |
-| 知识健康仪表盘完善 | 全域健康指标、成本监控、趋势分析 |
-| 飞书/Slack Bot 集成 | 让员工在原有工具内直接查询 Wiki |
-| 性能调优 | 大规模知识库（100,000+ 篇）下的检索性能优化 |
-| 灾难恢复演练 | 验证 RTO/RPO 目标 |
-
----
-
-## 16. 利益相关方（Stakeholders）
-
-> ⚠️ **Human review needed**：以下所有负责人待项目立项后填写。
-
-| 角色 | 姓名 / 团队 |
-|------|-------------|
-| Product Owner | ⚠️ [TBD] |
-| Tech Lead / 架构师 | ⚠️ [TBD] |
-| 知识管理负责人（内容所有者） | ⚠️ [TBD] |
-| Security Reviewer | ⚠️ [TBD]（信息安全团队） |
-| Architecture Approver | ⚠️ [TBD] |
-| 业务用户代表（客服/运营） | ⚠️ [TBD] |
-| 业务用户代表（研发） | ⚠️ [TBD] |
-| 数据治理团队 | ⚠️ [TBD] |
-
----
-
-## 附录：备选方案与未选择原因
-
-| 方案 | 描述 | 未选择原因 |
-|------|------|------------|
-| **纯 RAG 增强** | 优化现有 RAG（更好的 chunking、reranking） | 不解决根本问题：无状态、无知识积累、维护成本高 |
-| **Confluence AI 搜索** | 使用 Atlassian AI 的语义搜索增强 | 只是检索，不维护知识结构；无 Ingest/Query/Lint 自动化维护循环 |
-| **本地私有部署 LLM（如 Llama 3）** | 自建推理服务器，完全本地化 | 运维复杂度极高；初期团队规模无力维护；Azure OpenAI 已满足合规要求，成本可控 |
-| **Notion AI** | Notion 内置 AI 功能 | 仅辅助写作，无自动维护循环；数据驻留不确定；难以与企业现有系统深度集成 |
-
----
-
-*文档版本：v0.1 | 创建日期：2026-05-13 | 状态：待架构评审*
-*⚠️ Human review needed — 标注 [TBD] 的内容需在架构评审前确认*
+> **审查标记**：本设计在 §10.2（Wiki 后端、CI/CD）、§10.5（CMK）及 §16 全部条目处包含**假设或 TBD**，须**人工审核确认**后方可进入实施阶段。

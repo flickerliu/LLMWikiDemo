@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>8 · 工作计划</title>
+<link rel="stylesheet" href="assets/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<section class="slide">
+  <h1>工作计划 · 两阶段交付</h1>
+  <p class="sub">MVP 6 个月 → Scale-out 再 6 个月 · 总周期 30–38 周（约 7–9 个月，含缓冲）</p>
+  <div class="timeline">
+    <div class="tl"><div class="t">M0 · Sprint 0</div><div class="h">启动 & TBD 决议</div><div class="d">章程、§16 14 项 TBD、关键 ADR、治理框架</div></div>
+    <div class="tl"><div class="t">M1–M2</div><div class="h">Foundation & Identity</div><div class="d">Landing Zone、Bicep、私有端点、Policy、Entra 注册、RBAC</div></div>
+    <div class="tl"><div class="t">M2–M4</div><div class="h">Ingest + Wiki + Retrieval</div><div class="d">Graph 订阅、OCR、分类/综合/质量门控、AI Search、流式问答</div></div>
+    <div class="tl"><div class="t">M4–M5</div><div class="h">Frontend + Lint + Obs</div><div class="d">Next.js、审核操作台、Lint 调度、OTel + 仪表板 + 熔断器</div></div>
+    <div class="tl"><div class="t">M5–M6</div><div class="h">MVP 试点上线</div><div class="d">DPIA、信安、红队、UAT、≤500 用户单 BU 上线</div></div>
+    <div class="tl"><div class="t">M7–M12</div><div class="h">Scale-out 全量推广</div><div class="d">配额扩容、负载测试、500 万文件初始索引、DR 演练、分波次推广</div></div>
+  </div>
+  <div class="card" style="margin-top:14px;flex:1">
+    <h3>📅 Gantt 视图</h3>
+    <div class="chart-box"><canvas id="ganttChart"></canvas></div>
+  </div>
+</section>
+<script src="assets/deck.js"></script>
+<script>
+  const C = window.PALETTE;
+  const phases = [
+    {n:'TBD 决议 & ADR',s:0,e:1},
+    {n:'Foundation Platform',s:0.5,e:2.5},
+    {n:'Identity / Entra',s:1,e:2.5},
+    {n:'Schema & Governance',s:1.5,e:3},
+    {n:'Ingest Pipeline',s:2,e:5},
+    {n:'Wiki Store',s:2,e:4},
+    {n:'Retrieval & Q&A',s:2.5,e:4.5},
+    {n:'Lint / Governance',s:3.5,e:5},
+    {n:'Frontend',s:2,e:5.5},
+    {n:'Observability & Cost',s:3,e:5.5},
+    {n:'Security & Compliance',s:3.5,e:6},
+    {n:'MVP Pilot Cutover',s:5,e:6},
+    {n:'Scale-out Phase 2',s:6,e:9},
+  ];
+  new Chart(document.getElementById('ganttChart'), {
+    type: 'bar',
+    data: { labels: phases.map(p=>p.n), datasets:[{
+      data: phases.map(p=>[p.s,p.e]),
+      backgroundColor: phases.map((p,i)=>i===phases.length-1?C.pink:`hsl(${200+i*12} 75% 60%)`),
+      borderRadius: 6, barThickness: 14
+    }]},
+    options: {
+      indexAxis:'y',
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>`月 ${c.raw[0]} → ${c.raw[1]}` } } },
+      scales:{ x:{ min:0, max:9, grid:{color:'#2a3470'}, title:{display:true,text:'月（自启动起）',color:'#cdd5ff'} }, y:{ grid:{display:false} } }
+    }
+  });
+</script>
+</body>
+</html>

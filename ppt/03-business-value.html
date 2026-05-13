@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>3 · 业务价值</title>
+<link rel="stylesheet" href="assets/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<section class="slide">
+  <h1>业务价值</h1>
+  <p class="sub">从"知识坟场"到"知识复利" — 可量化的效率、合规与成本收益</p>
+  <div class="grid g2" style="margin-top:14px;flex:1">
+    <div class="card">
+      <h3>📈 关键收益指标对比</h3>
+      <div class="chart-box"><canvas id="valueChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>💡 价值矩阵</h3>
+      <div class="chart-box"><canvas id="valueRadar"></canvas></div>
+    </div>
+  </div>
+  <div class="grid g4" style="margin-top:14px">
+    <div class="card kpi"><span class="v">↓50%</span><span class="l">查询响应时间</span></div>
+    <div class="card kpi"><span class="v">↑10×</span><span class="l">知识沉淀复利</span></div>
+    <div class="card kpi"><span class="v">100%</span><span class="l">权限继承不扩张</span></div>
+    <div class="card kpi"><span class="v">12mo</span><span class="l">审计可追溯</span></div>
+  </div>
+</section>
+<script src="assets/deck.js"></script>
+<script>
+  const C = window.PALETTE;
+  new Chart(document.getElementById('valueChart'), {
+    type: 'bar',
+    data: {
+      labels: ['查询响应时间','维护工作自动化','事实一致性','审计覆盖','知识复利系数'],
+      datasets: [
+        { label: '现状', data: [100,10,70,30,1], backgroundColor: '#475569' },
+        { label: '目标', data: [50,90,95,100,10], backgroundColor: 'rgba(34,211,238,.85)', borderRadius: 6 }
+      ]
+    },
+    options: { plugins:{legend:{position:'bottom'}}, scales:{ y:{beginAtZero:true,grid:{color:'#2a3470'}}, x:{grid:{display:false}} } }
+  });
+  new Chart(document.getElementById('valueRadar'), {
+    type: 'radar',
+    data: {
+      labels: ['效率','一致性','合规可审计','成本控制','安全','员工体验'],
+      datasets: [
+        { label:'现状', data:[3,4,4,3,5,4], backgroundColor:'rgba(244,114,182,.2)', borderColor:C.pink, pointBackgroundColor:C.pink },
+        { label:'方案', data:[9,9,10,8,10,9], backgroundColor:'rgba(34,211,238,.25)', borderColor:C.cyan, pointBackgroundColor:C.cyan }
+      ]
+    },
+    options: { plugins:{legend:{position:'bottom'}}, scales:{ r:{min:0,max:10,grid:{color:'#2a3470'},angleLines:{color:'#2a3470'},pointLabels:{color:'#cdd5ff'}} } }
+  });
+</script>
+</body>
+</html>

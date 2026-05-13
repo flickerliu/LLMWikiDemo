@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>2 · 项目目的与范围</title>
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<section class="slide">
+  <h1>项目目的与范围</h1>
+  <p class="sub">Karpathy 三层模型 · 原始素材 → Wiki 知识库 → Schema/治理</p>
+  <div class="grid g2" style="margin-top:18px;flex:1">
+    <div class="card accent">
+      <h3>🎯 项目目的</h3>
+      <ul>
+        <li>构建组织"Company Brain"：将 OneDrive 散落文档持续编译为结构化、低矛盾、可追溯的 Wiki</li>
+        <li>查询响应较 RAG <b>缩短 ≥ 50%</b>，事实一致性 <b>≥ 95%</b></li>
+        <li><b>≥ 90%</b> 维护工作（摘要/链接/矛盾标记/时效）由 LLM Agent 自动完成</li>
+        <li>覆盖 <b>5,000 名活跃用户</b>，每用户 1,000 个源文件（共约 500 万份）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>✅ 范围内 / ❌ 范围外</h3>
+      <p class="small" style="margin:6px 0">范围内</p>
+      <ul>
+        <li>Web 前端、Entra ID SSO/MFA/RBAC、OneDrive 委托接入</li>
+        <li>Ingest / Query / Lint 三大 LLM 工作流</li>
+        <li>结构化 Wiki（双向链接、版本、元数据）+ 混合检索 + 治理</li>
+      </ul>
+      <p class="small" style="margin:10px 0 0">范围外</p>
+      <ul>
+        <li>外部公开访问、非 OneDrive 连接器（SharePoint/Confluence/Slack…）</li>
+        <li>对源文件回写、模型微调、原生移动端、实时多人协同</li>
+      </ul>
+    </div>
+  </div>
+  <div class="grid g4" style="margin-top:14px">
+    <div class="card kpi"><span class="v">5,000</span><span class="l">目标用户规模</span></div>
+    <div class="card kpi"><span class="v">5M</span><span class="l">源文件量</span></div>
+    <div class="card kpi"><span class="v">≥95%</span><span class="l">事实一致性</span></div>
+    <div class="card kpi"><span class="v">≥90%</span><span class="l">自动化维护占比</span></div>
+  </div>
+</section>
+<script src="assets/deck.js"></script>
+</body>
+</html>

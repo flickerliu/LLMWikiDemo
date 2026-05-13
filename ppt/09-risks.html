@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>9 · 风险分析</title>
+<link rel="stylesheet" href="assets/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<section class="slide">
+  <h1>风险分析</h1>
+  <p class="sub">Top 风险 · 概率 / 影响热力图 · 缓解策略</p>
+  <div class="grid g2" style="margin-top:14px;flex:1">
+    <div class="card">
+      <h3>🔥 风险概率 × 影响</h3>
+      <div class="chart-box"><canvas id="riskBubble"></canvas></div>
+      <p class="small">气泡大小 = 风险加权得分（概率 × 影响）</p>
+    </div>
+    <div class="card scroll">
+      <h3>🛡️ Top 风险与缓解</h3>
+      <table>
+        <thead><tr><th>风险</th><th>等级</th><th>缓解</th></tr></thead>
+        <tbody>
+          <tr><td>LLM 幻觉 / 知识失真</td><td><span class="pill tag-h">高</span></td><td>评估模型门控、强制引用、人工审批、置信度路由</td></tr>
+          <tr><td>权限泄露（跨 ACL）</td><td><span class="pill tag-h">高</span></td><td>分块 ACL + AI Search 过滤 + 红队测试</td></tr>
+          <tr><td>LLM 成本超支</td><td><span class="pill tag-m">中高</span></td><td>小模型 ≥70%、批量 Embedding、月度熔断器</td></tr>
+          <tr><td>Graph API 限流</td><td><span class="pill tag-m">中</span></td><td>Delta Query、按 driveId 并发、SB 死信重试</td></tr>
+          <tr><td>双向链接图规模化</td><td><span class="pill tag-m">中</span></td><td>Spike 验证、增量更新、孤儿检测作业</td></tr>
+          <tr><td>AI 节省不达预期</td><td><span class="pill tag-m">中</span></td><td>下调 30–50%，工期延长 2–4 周缓冲</td></tr>
+          <tr><td>区域 / 数据驻留违规</td><td><span class="pill tag-l">低</span></td><td>私有端点 + Policy as Code + 合规扫描</td></tr>
+          <tr><td>用户采纳不足</td><td><span class="pill tag-l">低</span></td><td>试点先行、透明引用、培训与变更管理</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<script src="assets/deck.js"></script>
+<script>
+  new Chart(document.getElementById('riskBubble'), {
+    type: 'bubble',
+    data: { datasets: [
+      { label:'LLM 幻觉',         data:[{x:4,y:5,r:24}], backgroundColor:'rgba(248,113,113,.7)' },
+      { label:'权限泄露',         data:[{x:2,y:5,r:22}], backgroundColor:'rgba(248,113,113,.7)' },
+      { label:'成本超支',         data:[{x:4,y:4,r:18}], backgroundColor:'rgba(251,191,36,.75)' },
+      { label:'Graph 限流',       data:[{x:4,y:3,r:14}], backgroundColor:'rgba(251,191,36,.75)' },
+      { label:'链接图规模化',     data:[{x:3,y:4,r:16}], backgroundColor:'rgba(251,191,36,.75)' },
+      { label:'AI 节省不达标',    data:[{x:3,y:3,r:14}], backgroundColor:'rgba(124,140,255,.75)' },
+      { label:'数据驻留违规',     data:[{x:1,y:5,r:14}], backgroundColor:'rgba(52,211,153,.7)' },
+      { label:'用户采纳不足',     data:[{x:3,y:2,r:12}], backgroundColor:'rgba(52,211,153,.7)' },
+      { label:'模型版本依赖',     data:[{x:2,y:3,r:11}], backgroundColor:'rgba(52,211,153,.7)' },
+    ]},
+    options: { plugins:{ legend:{position:'bottom',labels:{boxWidth:10}} },
+      scales: {
+        x:{ min:0, max:5, title:{display:true,text:'概率',color:'#cdd5ff'}, grid:{color:'#2a3470'} },
+        y:{ min:0, max:6, title:{display:true,text:'影响',color:'#cdd5ff'}, grid:{color:'#2a3470'} }
+      }
+    }
+  });
+</script>
+</body>
+</html>

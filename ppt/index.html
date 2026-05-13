@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>企业级 LLM 自维护知识库系统 · 方案演示</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg0:#0b1020;--bg1:#121a36;--bg2:#1b2553;
+    --accent:#7c8cff;--accent2:#22d3ee;--accent3:#f472b6;--accent4:#fbbf24;--accent5:#34d399;
+    --text:#e6eaff;--muted:#9aa3c7;--card:#161e3d;--border:#2a3470;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%;background:radial-gradient(1200px 800px at 20% 10%,#1d2a66 0%,var(--bg0) 60%) fixed;color:var(--text);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;}
+  .deck{position:relative;width:100vw;height:100vh;overflow:hidden}
+  .slide{position:absolute;inset:0;padding:48px 64px 80px;display:none;flex-direction:column;animation:fade .45s ease both}
+  .slide.active{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  h1{font-size:44px;margin:0 0 8px;letter-spacing:.5px;background:linear-gradient(90deg,#fff,#a5b4fc 60%,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h2{font-size:30px;margin:0 0 18px;color:#fff}
+  h3{margin:0 0 8px;color:#cdd5ff;font-weight:600}
+  p,li{line-height:1.55;color:var(--text)}
+  .sub{color:var(--muted);font-size:15px;margin-top:-4px}
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .card{background:linear-gradient(160deg,var(--card),#0f1838);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+  .card.accent{border-color:#3b4ab0}
+  .kpi{display:flex;flex-direction:column;gap:6px}
+  .kpi .v{font-size:36px;font-weight:700;background:linear-gradient(90deg,var(--accent2),var(--accent3));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .kpi .l{color:var(--muted);font-size:13px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:#23306e;color:#cdd5ff;font-size:12px;margin-right:6px;border:1px solid #34418f}
+  ul{margin:6px 0 0 18px;padding:0}
+  ul li{margin:4px 0}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{border-bottom:1px solid #2a3470;padding:8px 10px;text-align:left}
+  th{color:#cdd5ff;font-weight:600;background:#172046}
+  tr:hover td{background:#172046}
+  .footer{position:absolute;bottom:18px;left:64px;right:64px;display:flex;justify-content:space-between;color:var(--muted);font-size:13px}
+  .nav{position:absolute;bottom:14px;right:64px;display:flex;gap:8px;z-index:5}
+  .nav button{background:#23306e;color:#fff;border:1px solid #34418f;border-radius:8px;padding:6px 12px;cursor:pointer}
+  .nav button:hover{background:#2e3d8f}
+  .progress{position:absolute;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent2),var(--accent3));transition:width .3s}
+  .chart-box{position:relative;height:320px}
+  .chart-tall{position:relative;height:380px}
+  .mermaid{background:#0e1530;border-radius:12px;padding:14px;border:1px solid var(--border)}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:13px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .title-hero{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;height:100%}
+  .title-hero h1{font-size:64px}
+  .badge{display:inline-block;padding:4px 14px;border-radius:999px;background:linear-gradient(90deg,#22d3ee33,#7c8cff33);border:1px solid #3b4ab0;color:#cdd5ff;font-size:14px;margin-top:14px}
+  .timeline{display:flex;gap:12px;margin-top:12px}
+  .tl{flex:1;background:#0f1838;border:1px solid var(--border);border-radius:12px;padding:14px;position:relative}
+  .tl .t{font-size:13px;color:var(--muted)}
+  .tl .h{font-size:18px;font-weight:600;color:#fff;margin:4px 0}
+  .tl .d{font-size:13px;color:#cdd5ff}
+  .tag-h{background:#5e1a2e;color:#fecaca;border:1px solid #b91c1c}
+  .tag-m{background:#5b3a13;color:#fde68a;border:1px solid #b45309}
+  .tag-l{background:#143c2a;color:#bbf7d0;border:1px solid #15803d}
+  .scroll{overflow:auto;max-height:460px}
+  .ind{position:absolute;left:64px;bottom:18px;color:var(--muted);font-size:13px}
+  .small{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+  <div class="progress" id="progress"></div>
+
+  <!-- Slide 1: Title -->
+  <section class="slide active">
+    <div class="title-hero">
+      <div class="badge">Enterprise · Microsoft Azure · LLM Self-Maintaining Wiki</div>
+      <h1>企业级 LLM 自维护知识库系统</h1>
+      <p class="sub" style="font-size:18px;margin-top:14px">让企业知识沉淀为持续复利的"Company Brain"</p>
+      <p class="sub" style="margin-top:30px">方案演示 · 基于 solution-design.md 与 estimation.md</p>
+    </div>
+  </section>
+
+  <!-- Slide 2: 项目目的与范围 -->
+  <section class="slide">
+    <h1>项目目的与范围</h1>
+    <p class="sub">Karpathy 三层模型 · 原始素材 → Wiki 知识库 → Schema/治理</p>
+    <div class="grid g2" style="margin-top:18px;flex:1">
+      <div class="card accent">
+        <h3>🎯 项目目的</h3>
+        <ul>
+          <li>构建组织"Company Brain"：将 OneDrive 散落文档持续编译为结构化、低矛盾、可追溯的 Wiki</li>
+          <li>查询响应较 RAG <b>缩短 ≥ 50%</b>，事实一致性 <b>≥ 95%</b></li>
+          <li><b>≥ 90%</b> 维护工作（摘要/链接/矛盾标记/时效）由 LLM Agent 自动完成</li>
+          <li>覆盖 <b>5,000 名活跃用户</b>，每用户 1,000 个源文件（共约 500 万份）</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>✅ 范围内 / ❌ 范围外</h3>
+        <p class="small" style="margin:6px 0">范围内</p>
+        <ul>
+          <li>Web 前端、Entra ID SSO/MFA/RBAC、OneDrive 委托接入</li>
+          <li>Ingest / Query / Lint 三大 LLM 工作流</li>
+          <li>结构化 Wiki（双向链接、版本、元数据）+ 混合检索 + 治理</li>
+        </ul>
+        <p class="small" style="margin:10px 0 0">范围外</p>
+        <ul>
+          <li>外部公开访问、非 OneDrive 连接器（SharePoint/Confluence/Slack…）</li>
+          <li>对源文件回写、模型微调、原生移动端、实时多人协同</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid g4" style="margin-top:14px">
+      <div class="card kpi"><span class="v">5,000</span><span class="l">目标用户规模</span></div>
+      <div class="card kpi"><span class="v">5M</span><span class="l">源文件量</span></div>
+      <div class="card kpi"><span class="v">≥95%</span><span class="l">事实一致性</span></div>
+      <div class="card kpi"><span class="v">≥90%</span><span class="l">自动化维护占比</span></div>
+    </div>
+  </section>
+
+  <!-- Slide 3: 业务价值 -->
+  <section class="slide">
+    <h1>业务价值</h1>
+    <p class="sub">从"知识坟场"到"知识复利" — 可量化的效率、合规与成本收益</p>
+    <div class="grid g2" style="margin-top:14px;flex:1">
+      <div class="card">
+        <h3>📈 关键收益指标对比</h3>
+        <div class="chart-box"><canvas id="valueChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>💡 价值矩阵</h3>
+        <div class="chart-box"><canvas id="valueRadar"></canvas></div>
+      </div>
+    </div>
+    <div class="grid g4" style="margin-top:14px">
+      <div class="card kpi"><span class="v">↓50%</span><span class="l">查询响应时间</span></div>
+      <div class="card kpi"><span class="v">↑10×</span><span class="l">知识沉淀复利</span></div>
+      <div class="card kpi"><span class="v">100%</span><span class="l">权限继承不扩张</span></div>
+      <div class="card kpi"><span class="v">12mo</span><span class="l">审计可追溯</span></div>
+    </div>
+  </section>
+
+  <!-- Slide 4: 方案架构 -->
+  <section class="slide">
+    <h1>方案架构</h1>
+    <p class="sub">Azure 云原生 · 私有端点 · 托管标识 · 模型分级路由</p>
+    <div class="card" style="margin-top:10px;flex:1;overflow:auto">
+      <div class="mermaid">
+flowchart TB
+  U[👤 用户浏览器] -->|OIDC HTTPS| FD[Azure Front Door + WAF]
+  FD --> FE[Web 前端<br/>Container Apps]
+  FE --> APIM[API Management]
+  APIM --> API[Query / Wiki API<br/>Container Apps]
+  API --> SRCH[(Azure AI Search<br/>BM25 + 向量 + ACL)]
+  API --> GIT[(Wiki Store<br/>Azure DevOps Git)]
+  API --> PG[(PostgreSQL Flex<br/>元数据 / 审计)]
+  API --> AOAI[Azure OpenAI<br/>私有端点]
+
+  subgraph Ingest [摄入 Pipeline · 事件驱动]
+    GW[Graph Webhook<br/>Azure Functions] --> SB[(Service Bus Premium)]
+    SB --> JOB[Container Apps Jobs]
+    JOB --> EX[Extract / OCR<br/>Document Intelligence]
+    EX --> CLS[Classify · 小模型]
+    CLS --> SUM[Summarize · 大模型]
+    SUM --> QG[Quality Gate · Eval 模型]
+    QG --> COMMIT[Commit Git + Search + DB]
+  end
+
+  ONE[(OneDrive for Business)] -.->|Delta Query| GW
+  COMMIT --> GIT
+  COMMIT --> SRCH
+  COMMIT --> PG
+
+  subgraph Gov [治理 / Lint]
+    LINT[ACA Jobs · 定时扫描] --> NOTIF[Teams / Graph sendMail]
+  end
+  GIT --> LINT
+
+  KV[Key Vault] --- API
+  MON[Azure Monitor + App Insights] --- API
+
+  classDef sec fill:#3a1f5c,stroke:#a78bfa,color:#fff
+  classDef ops fill:#1f3a5c,stroke:#7dd3fc,color:#fff
+  class KV sec
+  class MON ops
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 5: 关键技术选型 -->
+  <section class="slide">
+    <h1>关键技术选型</h1>
+    <p class="sub">组件 → Azure 服务映射（节选）· 安全默认开启、成本护栏内建</p>
+    <div class="grid g2" style="margin-top:14px;flex:1">
+      <div class="card scroll">
+        <table>
+          <thead><tr><th>组件</th><th>Azure 服务</th><th>理由</th></tr></thead>
+          <tbody>
+            <tr><td>边缘 / WAF</td><td>Front Door Premium</td><td>全球加速、私有源</td></tr>
+            <tr><td>API 网关</td><td>API Management</td><td>鉴权/限流/审计</td></tr>
+            <tr><td>Web/API/Worker</td><td>Container Apps + Jobs</td><td>KEDA 自动伸缩</td></tr>
+            <tr><td>事件总线</td><td>Service Bus Premium</td><td>解耦、死信、保序</td></tr>
+            <tr><td>检索</td><td>Azure AI Search</td><td>BM25+向量+ACL 过滤</td></tr>
+            <tr><td>LLM</td><td>Azure OpenAI 私有端点</td><td>区域锁定、企业 SLA</td></tr>
+            <tr><td>OCR</td><td>Document Intelligence</td><td>PDF/扫描件/表格</td></tr>
+            <tr><td>Wiki 后端</td><td>Azure DevOps Repos (Git)</td><td>PR/diff/审批</td></tr>
+            <tr><td>元数据</td><td>PostgreSQL Flex</td><td>审计/审批/HA</td></tr>
+            <tr><td>身份</td><td>Entra ID + MSAL</td><td>OIDC/委托 Graph</td></tr>
+            <tr><td>密钥</td><td>Key Vault + MI</td><td>无密钥落码</td></tr>
+            <tr><td>可观测</td><td>Monitor + App Insights</td><td>OTel + 分布式追踪</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>🛡️ 安全 & 治理原则</h3>
+        <ul>
+          <li><b>权限继承而非扩张</b>：摄入时记录每分块 ACL，查询时 <code>search.in()</code> 过滤</li>
+          <li><b>全私有端点</b>：AOAI / AI Search / PostgreSQL / Blob / Key Vault</li>
+          <li><b>托管标识</b> 全链路 + Key Vault 集中密钥 + OIDC 联邦 CI/CD</li>
+          <li><b>模型分级</b>：≥70% 走小模型；大模型仅用于综合与最终问答</li>
+          <li><b>成本护栏</b>：Embedding 缓存 + 批量 + 月度 Token 熔断器</li>
+          <li><b>敏感度感知</b>：M365 标签 → 排除 / 脱敏 / 专属审批</li>
+        </ul>
+        <h3 style="margin-top:14px">🔁 三大 LLM 工作流</h3>
+        <p><span class="pill">Ingest</span><span class="pill">Query</span><span class="pill">Lint / Governance</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 6: 工作量评估 - 概览 -->
+  <section class="slide">
+    <h1>工作量评估 · 概览</h1>
+    <p class="sub">三点估算 + AI 辅助调整 · 13 Epic / 69 任务</p>
+    <div class="grid g4" style="margin-top:14px">
+      <div class="card kpi"><span class="v">186</span><span class="l">Optimistic（人天）</span></div>
+      <div class="card kpi"><span class="v">313</span><span class="l">Likely 毛估</span></div>
+      <div class="card kpi"><span class="v">512</span><span class="l">Pessimistic</span></div>
+      <div class="card kpi"><span class="v">218</span><span class="l">⭐ Adj. Likely 基线</span></div>
+    </div>
+    <div class="grid g2" style="margin-top:14px;flex:1">
+      <div class="card">
+        <h3>📊 三点估算 vs AI 调整后</h3>
+        <div class="chart-box"><canvas id="estChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>👥 角色拆分（Adj. Likely）</h3>
+        <div class="chart-box"><canvas id="roleChart"></canvas></div>
+        <p class="small">PM 41 · Architect 68 · Consultant 110（人天）</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 7: 工作量 - AI 节省 + Epic -->
+  <section class="slide">
+    <h1>工作量评估 · AI 节省与 Epic 分布</h1>
+    <p class="sub">AI 辅助预计节省 ~94.8 人天（~30%）· High leverage 区域达 50%</p>
+    <div class="grid g2" style="margin-top:14px;flex:1">
+      <div class="card">
+        <h3>🤖 AI 辅助节省（按杠杆等级）</h3>
+        <div class="chart-box"><canvas id="aiChart"></canvas></div>
+        <div class="legend">
+          <span><span class="dot" style="background:#34d399"></span>High ~50%</span>
+          <span><span class="dot" style="background:#22d3ee"></span>Medium ~32%</span>
+          <span><span class="dot" style="background:#fbbf24"></span>Low ~17%</span>
+          <span><span class="dot" style="background:#f472b6"></span>None 0%</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🧱 Epic 工作量分布（Adj. Likely）</h3>
+        <div class="chart-tall"><canvas id="epicChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 8: 工作计划 -->
+  <section class="slide">
+    <h1>工作计划 · 两阶段交付</h1>
+    <p class="sub">MVP 6 个月 → Scale-out 再 6 个月 · 总周期 30–38 周（约 7–9 个月，含缓冲）</p>
+    <div class="timeline">
+      <div class="tl"><div class="t">M0 · Sprint 0</div><div class="h">启动 & TBD 决议</div><div class="d">章程、§16 14 项 TBD、关键 ADR、治理框架</div></div>
+      <div class="tl"><div class="t">M1–M2</div><div class="h">Foundation & Identity</div><div class="d">Landing Zone、Bicep、私有端点、Policy、Entra 注册、RBAC</div></div>
+      <div class="tl"><div class="t">M2–M4</div><div class="h">Ingest + Wiki + Retrieval</div><div class="d">Graph 订阅、OCR、分类/综合/质量门控、AI Search、流式问答</div></div>
+      <div class="tl"><div class="t">M4–M5</div><div class="h">Frontend + Lint + Obs</div><div class="d">Next.js、审核操作台、Lint 调度、OTel + 仪表板 + 熔断器</div></div>
+      <div class="tl"><div class="t">M5–M6</div><div class="h">MVP 试点上线</div><div class="d">DPIA、信安、红队、UAT、≤500 用户单 BU 上线</div></div>
+      <div class="tl"><div class="t">M7–M12</div><div class="h">Scale-out 全量推广</div><div class="d">配额扩容、负载测试、500 万文件初始索引、DR 演练、分波次推广</div></div>
+    </div>
+    <div class="card" style="margin-top:14px;flex:1">
+      <h3>📅 Gantt 视图</h3>
+      <div class="chart-box"><canvas id="ganttChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- Slide 9: 风险分析 -->
+  <section class="slide">
+    <h1>风险分析</h1>
+    <p class="sub">Top 风险 · 概率 / 影响热力图 · 缓解策略</p>
+    <div class="grid g2" style="margin-top:14px;flex:1">
+      <div class="card">
+        <h3>🔥 风险概率 × 影响</h3>
+        <div class="chart-box"><canvas id="riskBubble"></canvas></div>
+        <p class="small">气泡大小 = 风险加权得分（概率 × 影响）</p>
+      </div>
+      <div class="card scroll">
+        <h3>🛡️ Top 风险与缓解</h3>
+        <table>
+          <thead><tr><th>风险</th><th>等级</th><th>缓解</th></tr></thead>
+          <tbody>
+            <tr><td>LLM 幻觉 / 知识失真</td><td><span class="pill tag-h">高</span></td><td>评估模型门控、强制引用、人工审批、置信度路由</td></tr>
+            <tr><td>权限泄露（跨 ACL）</td><td><span class="pill tag-h">高</span></td><td>分块 ACL + AI Search 过滤 + 红队测试</td></tr>
+            <tr><td>LLM 成本超支</td><td><span class="pill tag-m">中高</span></td><td>小模型 ≥70%、批量 Embedding、月度熔断器</td></tr>
+            <tr><td>Graph API 限流</td><td><span class="pill tag-m">中</span></td><td>Delta Query、按 driveId 并发、SB 死信重试</td></tr>
+            <tr><td>双向链接图规模化</td><td><span class="pill tag-m">中</span></td><td>Spike 验证、增量更新、孤儿检测作业</td></tr>
+            <tr><td>AI 节省不达预期</td><td><span class="pill tag-m">中</span></td><td>下调 30–50%，工期延长 2–4 周缓冲</td></tr>
+            <tr><td>区域 / 数据驻留违规</td><td><span class="pill tag-l">低</span></td><td>私有端点 + Policy as Code + 合规扫描</td></tr>
+            <tr><td>用户采纳不足</td><td><span class="pill tag-l">低</span></td><td>试点先行、透明引用、培训与变更管理</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 10: 下一步 -->
+  <section class="slide">
+    <h1>下一步行动</h1>
+    <p class="sub">阻塞最终承诺的 14 项 TBD 须在 Foundation Sprint 启动前关闭</p>
+    <div class="grid g3" style="margin-top:18px;flex:1">
+      <div class="card">
+        <h3>1️⃣ 决议阻塞项</h3>
+        <ul>
+          <li>Azure 区域 & 数据驻留</li>
+          <li>云 + LLM 月度预算上限</li>
+          <li>Wiki 后端 / 元数据库 / CI/CD 选型</li>
+          <li>CMK 强制范围、敏感度矩阵</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>2️⃣ 启动并行轨道</h3>
+        <ul>
+          <li>Foundation Platform（Bicep / Landing Zone）</li>
+          <li>Identity（Entra 应用 + 管理员同意）</li>
+          <li>Azure OpenAI 配额申请（关键路径）</li>
+          <li>信安评审 + DPIA 排队</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>3️⃣ Spike 验证高风险</h3>
+        <ul>
+          <li>质量门控双模型 PoC</li>
+          <li>查询时权限过滤红队闭环</li>
+          <li>双向链接图规模化压测</li>
+          <li>500 万文件初始索引干跑</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px;text-align:center;padding:24px">
+      <h2 style="margin:0">让 OneDrive 中的"沉默资产"<span style="color:var(--accent2)">复利成 Company Brain</span></h2>
+      <p class="sub" style="margin-top:10px">谢谢观看 · Q&A</p>
+    </div>
+  </section>
+
+  <div class="nav">
+    <button onclick="go(-1)">◀ 上一页</button>
+    <span id="counter" style="color:#cdd5ff;align-self:center;margin:0 6px"></span>
+    <button onclick="go(1)">下一页 ▶</button>
+  </div>
+</div>
+
+<script>
+  mermaid.initialize({startOnLoad:true,theme:'dark',themeVariables:{
+    primaryColor:'#1b2553',primaryTextColor:'#e6eaff',primaryBorderColor:'#3b4ab0',
+    lineColor:'#7c8cff',secondaryColor:'#22305c',tertiaryColor:'#0f1838',fontSize:'14px'
+  }});
+
+  const slides=[...document.querySelectorAll('.slide')];
+  let idx=0;
+  function show(i){
+    idx=(i+slides.length)%slides.length;
+    slides.forEach((s,k)=>s.classList.toggle('active',k===idx));
+    document.getElementById('progress').style.width=((idx+1)/slides.length*100)+'%';
+    document.getElementById('counter').textContent=`${idx+1} / ${slides.length}`;
+  }
+  function go(d){show(idx+d)}
+  document.addEventListener('keydown',e=>{
+    if(['ArrowRight','PageDown',' '].includes(e.key))go(1);
+    else if(['ArrowLeft','PageUp'].includes(e.key))go(-1);
+    else if(e.key==='Home')show(0);
+    else if(e.key==='End')show(slides.length-1);
+  });
+  show(0);
+
+  // Chart.js global defaults
+  Chart.defaults.color='#cdd5ff';
+  Chart.defaults.borderColor='#2a3470';
+  Chart.defaults.font.family='"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif';
+  const C={accent:'#7c8cff',cyan:'#22d3ee',pink:'#f472b6',amber:'#fbbf24',green:'#34d399',red:'#f87171'};
+
+  // Value chart
+  new Chart(document.getElementById('valueChart'),{
+    type:'bar',
+    data:{
+      labels:['查询响应时间','维护工作自动化','事实一致性','审计覆盖','知识复利系数'],
+      datasets:[
+        {label:'现状',data:[100,10,70,30,1],backgroundColor:'#475569'},
+        {label:'目标',data:[50,90,95,100,10],backgroundColor:'rgba(34,211,238,.85)',borderRadius:6}
+      ]
+    },
+    options:{plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,grid:{color:'#2a3470'}},x:{grid:{display:false}}}}
+  });
+
+  // Value radar
+  new Chart(document.getElementById('valueRadar'),{
+    type:'radar',
+    data:{
+      labels:['效率','一致性','合规可审计','成本控制','安全','员工体验'],
+      datasets:[
+        {label:'现状',data:[3,4,4,3,5,4],backgroundColor:'rgba(244,114,182,.2)',borderColor:C.pink,pointBackgroundColor:C.pink},
+        {label:'方案',data:[9,9,10,8,10,9],backgroundColor:'rgba(34,211,238,.25)',borderColor:C.cyan,pointBackgroundColor:C.cyan}
+      ]
+    },
+    options:{plugins:{legend:{position:'bottom'}},scales:{r:{min:0,max:10,grid:{color:'#2a3470'},angleLines:{color:'#2a3470'},pointLabels:{color:'#cdd5ff'}}}}
+  });
+
+  // Estimation chart
+  new Chart(document.getElementById('estChart'),{
+    type:'bar',
+    data:{
+      labels:['PM','Architect','Consultant','Total'],
+      datasets:[
+        {label:'Optimistic',data:[31,51,104,186],backgroundColor:C.green},
+        {label:'Likely (Gross)',data:[50,87,176,313],backgroundColor:C.cyan},
+        {label:'Pessimistic',data:[82,142,288,512],backgroundColor:C.red},
+        {label:'Adj. Likely',data:[41,68,110,218],backgroundColor:C.amber,borderRadius:6}
+      ]
+    },
+    options:{plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,grid:{color:'#2a3470'}},x:{grid:{display:false}}}}
+  });
+
+  // Role pie
+  new Chart(document.getElementById('roleChart'),{
+    type:'doughnut',
+    data:{labels:['PM','Architect','Consultant'],datasets:[{data:[41,68,110],backgroundColor:[C.pink,C.accent,C.cyan],borderColor:'#0f1838',borderWidth:3}]},
+    options:{plugins:{legend:{position:'bottom'}},cutout:'58%'}
+  });
+
+  // AI savings
+  new Chart(document.getElementById('aiChart'),{
+    type:'bar',
+    data:{
+      labels:['High','Medium','Low','None'],
+      datasets:[
+        {label:'Gross Likely',data:[65,148,83,17],backgroundColor:'#475569'},
+        {label:'Net Effort',data:[32.2,100.3,68.7,17],backgroundColor:C.green,borderRadius:6},
+        {label:'AI Savings',data:[32.8,47.7,14.3,0],backgroundColor:C.amber,borderRadius:6}
+      ]
+    },
+    options:{plugins:{legend:{position:'bottom'}},scales:{y:{stacked:false,beginAtZero:true,grid:{color:'#2a3470'}},x:{grid:{display:false}}}}
+  });
+
+  // Epic distribution (Adj. Likely approximate)
+  const epics=[
+    ['E1 启动 & TBD',13.3],['E2 Foundation',22.0],['E3 Identity',10.7],['E4 Schema/Gov',10.4],
+    ['E5 Ingest Pipeline',34.6],['E6 Wiki Store',10.3],['E7 Retrieval & QA',15.4],['E8 Lint',9.5],
+    ['E9 Frontend',16.9],['E10 Obs/Cost',11.2],['E11 Sec/Compliance',16.6],['E12 MVP Cutover',15.9],['E13 Scale-out',30.9]
+  ];
+  new Chart(document.getElementById('epicChart'),{
+    type:'bar',
+    data:{labels:epics.map(e=>e[0]),datasets:[{label:'人天',data:epics.map(e=>e[1]),backgroundColor:epics.map((_,i)=>`hsl(${(i*28)%360} 70% 60%)`),borderRadius:6}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,grid:{color:'#2a3470'}},y:{grid:{display:false}}}}
+  });
+
+  // Gantt (horizontal floating bar)
+  const phases=[
+    {n:'TBD 决议 & ADR',s:0,e:1},
+    {n:'Foundation Platform',s:0.5,e:2.5},
+    {n:'Identity / Entra',s:1,e:2.5},
+    {n:'Schema & Governance',s:1.5,e:3},
+    {n:'Ingest Pipeline',s:2,e:5},
+    {n:'Wiki Store',s:2,e:4},
+    {n:'Retrieval & Q&A',s:2.5,e:4.5},
+    {n:'Lint / Governance',s:3.5,e:5},
+    {n:'Frontend',s:2,e:5.5},
+    {n:'Observability & Cost',s:3,e:5.5},
+    {n:'Security & Compliance',s:3.5,e:6},
+    {n:'MVP Pilot Cutover',s:5,e:6},
+    {n:'Scale-out Phase 2',s:6,e:9},
+  ];
+  new Chart(document.getElementById('ganttChart'),{
+    type:'bar',
+    data:{labels:phases.map(p=>p.n),datasets:[{
+      data:phases.map(p=>[p.s,p.e]),
+      backgroundColor:phases.map((p,i)=>i===phases.length-1?C.pink:`hsl(${200+i*12} 75% 60%)`),
+      borderRadius:6,barThickness:14
+    }]},
+    options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`月 ${c.raw[0]} → ${c.raw[1]}`}}},
+      scales:{x:{min:0,max:9,grid:{color:'#2a3470'},title:{display:true,text:'月（自启动起）',color:'#cdd5ff'}},y:{grid:{display:false}}}}
+  });
+
+  // Risk bubble
+  new Chart(document.getElementById('riskBubble'),{
+    type:'bubble',
+    data:{datasets:[
+      {label:'LLM 幻觉',data:[{x:4,y:5,r:24}],backgroundColor:'rgba(248,113,113,.7)'},
+      {label:'权限泄露',data:[{x:2,y:5,r:22}],backgroundColor:'rgba(248,113,113,.7)'},
+      {label:'成本超支',data:[{x:4,y:4,r:18}],backgroundColor:'rgba(251,191,36,.75)'},
+      {label:'Graph 限流',data:[{x:4,y:3,r:14}],backgroundColor:'rgba(251,191,36,.75)'},
+      {label:'链接图规模化',data:[{x:3,y:4,r:16}],backgroundColor:'rgba(251,191,36,.75)'},
+      {label:'AI 节省不达标',data:[{x:3,y:3,r:14}],backgroundColor:'rgba(124,140,255,.75)'},
+      {label:'数据驻留违规',data:[{x:1,y:5,r:14}],backgroundColor:'rgba(52,211,153,.7)'},
+      {label:'用户采纳不足',data:[{x:3,y:2,r:12}],backgroundColor:'rgba(52,211,153,.7)'},
+      {label:'模型版本依赖',data:[{x:2,y:3,r:11}],backgroundColor:'rgba(52,211,153,.7)'},
+    ]},
+    options:{plugins:{legend:{position:'bottom',labels:{boxWidth:10}}},
+      scales:{
+        x:{min:0,max:5,title:{display:true,text:'概率',color:'#cdd5ff'},grid:{color:'#2a3470'}},
+        y:{min:0,max:6,title:{display:true,text:'影响',color:'#cdd5ff'},grid:{color:'#2a3470'}}
+      }}
+  });
+</script>
+</body>
+</html>

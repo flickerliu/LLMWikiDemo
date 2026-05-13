@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>6 · 工作量评估 · 概览</title>
+<link rel="stylesheet" href="assets/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<section class="slide">
+  <h1>工作量评估 · 概览</h1>
+  <p class="sub">三点估算 + AI 辅助调整 · 13 Epic / 69 任务</p>
+  <div class="grid g4" style="margin-top:14px">
+    <div class="card kpi"><span class="v">186</span><span class="l">Optimistic（人天）</span></div>
+    <div class="card kpi"><span class="v">313</span><span class="l">Likely 毛估</span></div>
+    <div class="card kpi"><span class="v">512</span><span class="l">Pessimistic</span></div>
+    <div class="card kpi"><span class="v">218</span><span class="l">⭐ Adj. Likely 基线</span></div>
+  </div>
+  <div class="grid g2" style="margin-top:14px;flex:1">
+    <div class="card">
+      <h3>📊 三点估算 vs AI 调整后</h3>
+      <div class="chart-box"><canvas id="estChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>👥 角色拆分（Adj. Likely）</h3>
+      <div class="chart-box"><canvas id="roleChart"></canvas></div>
+      <p class="small">PM 41 · Architect 68 · Consultant 110（人天）</p>
+    </div>
+  </div>
+</section>
+<script src="assets/deck.js"></script>
+<script>
+  const C = window.PALETTE;
+  new Chart(document.getElementById('estChart'), {
+    type: 'bar',
+    data: {
+      labels: ['PM','Architect','Consultant','Total'],
+      datasets: [
+        { label:'Optimistic', data:[31,51,104,186], backgroundColor:C.green },
+        { label:'Likely (Gross)', data:[50,87,176,313], backgroundColor:C.cyan },
+        { label:'Pessimistic', data:[82,142,288,512], backgroundColor:C.red },
+        { label:'Adj. Likely', data:[41,68,110,218], backgroundColor:C.amber, borderRadius:6 }
+      ]
+    },
+    options: { plugins:{legend:{position:'bottom'}}, scales:{ y:{beginAtZero:true,grid:{color:'#2a3470'}}, x:{grid:{display:false}} } }
+  });
+  new Chart(document.getElementById('roleChart'), {
+    type: 'doughnut',
+    data: { labels:['PM','Architect','Consultant'], datasets:[{ data:[41,68,110], backgroundColor:[C.pink,C.accent,C.cyan], borderColor:'#0f1838', borderWidth:3 }] },
+    options: { plugins:{legend:{position:'bottom'}}, cutout:'58%' }
+  });
+</script>
+</body>
+</html>

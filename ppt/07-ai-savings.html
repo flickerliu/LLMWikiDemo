@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>7 · AI 节省与 Epic 分布</title>
+<link rel="stylesheet" href="assets/styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<section class="slide">
+  <h1>工作量评估 · AI 节省与 Epic 分布</h1>
+  <p class="sub">AI 辅助预计节省 ~94.8 人天（~30%）· High leverage 区域达 50%</p>
+  <div class="grid g2" style="margin-top:14px;flex:1">
+    <div class="card">
+      <h3>🤖 AI 辅助节省（按杠杆等级）</h3>
+      <div class="chart-box"><canvas id="aiChart"></canvas></div>
+      <div class="legend">
+        <span><span class="dot" style="background:#34d399"></span>High ~50%</span>
+        <span><span class="dot" style="background:#22d3ee"></span>Medium ~32%</span>
+        <span><span class="dot" style="background:#fbbf24"></span>Low ~17%</span>
+        <span><span class="dot" style="background:#f472b6"></span>None 0%</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🧱 Epic 工作量分布（Adj. Likely）</h3>
+      <div class="chart-tall"><canvas id="epicChart"></canvas></div>
+    </div>
+  </div>
+</section>
+<script src="assets/deck.js"></script>
+<script>
+  const C = window.PALETTE;
+  new Chart(document.getElementById('aiChart'), {
+    type: 'bar',
+    data: {
+      labels: ['High','Medium','Low','None'],
+      datasets: [
+        { label:'Gross Likely', data:[65,148,83,17], backgroundColor:'#475569' },
+        { label:'Net Effort',   data:[32.2,100.3,68.7,17], backgroundColor:C.green, borderRadius:6 },
+        { label:'AI Savings',   data:[32.8,47.7,14.3,0], backgroundColor:C.amber, borderRadius:6 }
+      ]
+    },
+    options: { plugins:{legend:{position:'bottom'}}, scales:{ y:{beginAtZero:true,grid:{color:'#2a3470'}}, x:{grid:{display:false}} } }
+  });
+  const epics = [
+    ['E1 启动 & TBD',13.3],['E2 Foundation',22.0],['E3 Identity',10.7],['E4 Schema/Gov',10.4],
+    ['E5 Ingest Pipeline',34.6],['E6 Wiki Store',10.3],['E7 Retrieval & QA',15.4],['E8 Lint',9.5],
+    ['E9 Frontend',16.9],['E10 Obs/Cost',11.2],['E11 Sec/Compliance',16.6],['E12 MVP Cutover',15.9],['E13 Scale-out',30.9]
+  ];
+  new Chart(document.getElementById('epicChart'), {
+    type: 'bar',
+    data: { labels: epics.map(e=>e[0]), datasets:[{ label:'人天', data:epics.map(e=>e[1]), backgroundColor:epics.map((_,i)=>`hsl(${(i*28)%360} 70% 60%)`), borderRadius:6 }] },
+    options: { indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{beginAtZero:true,grid:{color:'#2a3470'}}, y:{grid:{display:false}} } }
+  });
+</script>
+</body>
+</html>
