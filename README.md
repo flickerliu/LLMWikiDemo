@@ -1,6 +1,6 @@
-# Copilot Template Pack
+# LLMWiki Template Pack
 
-这是一套面向企业项目的 GitHub Copilot 模板包，覆盖以下环节：
+这是一套以LLMWiki系统为样例，面向企业项目的 GitHub Copilot 模板包，覆盖以下环节：
 
 - 方案设计（Solution Design）
 - 架构评审（Architecture Review）
