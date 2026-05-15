@@ -1,57 +1,83 @@
-# Copilot Template Pack
+# Enterprise LLM Wiki - Copilot Workspace
 
-这是一套面向企业项目的 GitHub Copilot 模板包，覆盖以下环节：
+这是一个用于企业级 LLM Wiki 方案设计、任务拆解、估算与客户演示的 GitHub Copilot 工作区。
 
-- 方案设计（Solution Design）
-- 架构评审（Architecture Review）
-- 工作量预估（Estimate Work）
-- 任务拆解（Create Backlog）
-- 实施计划（Implementation Plan）
-- 项目级指令（Repository Instructions）
-- 模块级指令（Path-specific Instructions）
-- Agent 行为约束（AGENTS.md）
+当前仓库已经包含从研究、需求、方案、backlog、估算到演示页的完整骨架。
 
-## 目录结构
+## 当前目录结构
 
 ```text
-.github/
-  copilot-instructions.md
-  AGENTS.md
-  instructions/
-    frontend-react.instructions.md
-    backend-api.instructions.md
-    docs-adr.instructions.md
-  prompts/
-    solution-design.prompt.md
-    architecture-review.prompt.md
-    estimate-work.prompt.md
-    create-backlog.prompt.md
-    implementation-plan.prompt.md
+.
+├─ .github/
+│  ├─ AGENTS.md
+│  ├─ copilot-instructions.md
+│  ├─ instructions/
+│  │  ├─ backend-api.instructions.md
+│  │  ├─ docs-adr.instructions.md
+│  │  └─ frontend-react.instructions.md
+│  └─ prompts/
+│     ├─ create-backlog.prompt.md
+│     ├─ develop-protoype.prompt.md
+│     ├─ estimate-work.prompt.md
+│     ├─ implementation-plan.prompt.md
+│     ├─ peer-review.prompt.md
+│     └─ solution-design.prompt.md
+├─ docs/
+│  ├─ Enterprise LLM Wiki System Research Report.md
+│  ├─ requirements.md
+│  ├─ solution-design.md
+│  ├─ backlogs.md
+│  └─ estimation.md
+├─ ppt/
+│  ├─ index.html
+│  ├─ 01-cover.html
+│  ├─ 02-purpose-scope.html
+│  ├─ 03-business-value.html
+│  ├─ 04-architecture.html
+│  ├─ 05-tech-stack.html
+│  ├─ 06-estimation.html
+│  ├─ 07-ai-savings.html
+│  ├─ 08-work-plan.html
+│  ├─ 09-risks.html
+│  ├─ 10-next-steps.html
+│  └─ assets/
+├─ src/
+├─ templates/
+│  └─ requirements.template.md
+└─ DemoSteps.md
 ```
 
-## 推荐使用顺序
+## 文档与产物说明
 
-1. 先补充 `.github/copilot-instructions.md` 中的组织级规则与技术栈约束。
-2. 按项目需要调整 `instructions/` 下的模块级规范。
-3. 使用 `/solution-design` 输出方案初稿。
-4. 使用 `/architecture-review` 做备选方案与权衡。
-5. 使用 `/estimate-work` 做任务拆解与三点估算。
-6. 使用 `/create-backlog` 把方案转为 Epic / Feature / Task。
-7. 使用 `/implementation-plan` 生成实施步骤、验证与回滚计划。
+- `docs/Enterprise LLM Wiki System Research Report.md`：研究报告输入。
+- `docs/requirements.md`：需求文档。
+- `docs/solution-design.md`：解决方案设计。
+- `docs/backlogs.md`：Epic/Feature/Task backlog。
+- `docs/estimation.md`：工作量评估。
+- `ppt/`：客户演示用 HTML Deck。
+- `src/`：原型或实现代码目录（当前预留）。
 
-## 建议定制项
+## Prompt 清单
 
-请优先替换以下占位符：
+- `/solution-design`：生成方案设计。
+- `/create-backlog`：生成任务拆解。
+- `/estimate-work`：生成估算。
+- `/implementation-plan`：生成实施计划。
+- `/peer-review`：生成评审报告。
+- `/develop-protoype`：基于 requirements、solution-design、feature backlog 生成可交互原型 UI 代码。
 
-- `[YOUR_ORG]`
-- `[YOUR_SYSTEM]`
-- `[YOUR_TECH_STACK]`
-- `[SECURITY_BASELINE]`
-- `[COMPLIANCE_REQUIREMENTS]`
-- `[NFR_REQUIREMENTS]`
+## 推荐流程
 
-## 小建议
+1. 参考 `templates/requirements.template.md` 完成 `docs/requirements.md`。
+2. 执行 `/solution-design` 生成 `docs/solution-design.md`。
+3. 执行 `/create-backlog` 生成 `docs/backlogs.md`。
+4. 执行 `/estimate-work` 生成 `docs/estimation.md`。
+5. 执行 `/develop-protoype` 产出可交互原型 UI（建议输出到 `src/`）。
+6. 结合 `docs/solution-design.md` 与 `docs/estimation.md` 更新 `ppt/` 演示页面。
+7. 执行 `/peer-review` 形成评审结论。
 
-- Prompt 文件建议优先使用英文，以获得更稳定的一致性输出。
-- README/注释可保留中文，便于团队推广。
-- 对估算结果务必做人工复核，不要直接作为承诺值。
+## 使用建议
+
+- Prompt 内容建议使用英文，产出更稳定。
+- 面向内部评审和客户沟通的文档可使用中文。
+- backlog 与 estimation 建议保留人工复核与签字环节。
