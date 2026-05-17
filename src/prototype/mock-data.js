@@ -238,12 +238,79 @@ window.mockData = {
   sourceDocuments: [
     { id: "src-expense-policy", title: "FY26 Travel and Expense Policy.docx", owner: "Finance Operations", location: "OneDrive / Finance / Policies", type: "docx", lastModified: "2026-05-14", status: "Indexed", sensitivity: "Internal", acl: ["Finance Readers", "All Employees"], pageIds: ["wiki-travel-expense"] },
     { id: "src-travel-faq", title: "Travel FAQ.md", owner: "Finance Operations", location: "OneDrive / Finance / FAQ", type: "markdown", lastModified: "2026-05-13", status: "Indexed", sensitivity: "Internal", acl: ["All Employees"], pageIds: ["wiki-travel-expense", "wiki-new-hire-onboarding"] },
+    { id: "src-finance-q2", title: "Q2 Finance Policy Change Email.eml", owner: "Finance Operations", location: "OneDrive / Finance / Announcements", type: "email", lastModified: "2026-05-11", status: "Indexed", sensitivity: "Internal", acl: ["Finance Readers", "All Employees"], pageIds: ["wiki-travel-expense", "wiki-cost-guardrails"] },
     { id: "src-security-approval", title: "Sensitive Update Approval Matrix.xlsx", owner: "Information Security", location: "OneDrive / Security / Governance", type: "xlsx", lastModified: "2026-05-15", status: "Indexed", sensitivity: "Confidential", acl: ["Security Reviewers"], pageIds: ["wiki-approval-matrix"] },
     { id: "src-data-classification", title: "Data Classification Standard.pdf", owner: "Compliance Office", location: "OneDrive / Risk / Standards", type: "pdf", lastModified: "2026-05-04", status: "OCR Complete", sensitivity: "Confidential", acl: ["Compliance Office", "Security Reviewers"], pageIds: ["wiki-approval-matrix", "wiki-audit-retention"] },
     { id: "src-old-approval-sla", title: "Legacy Approval SLA.pptx", owner: "Unknown", location: "OneDrive / Archive / Governance", type: "pptx", lastModified: "2025-10-18", status: "Conflict", sensitivity: "Internal", acl: ["All Employees"], pageIds: ["wiki-approval-matrix", "wiki-stale-content"] },
     { id: "src-worker-runbook", title: "Ingestion Worker Runbook.md", owner: "Cloud and AI Engineering", location: "OneDrive / Platform / Runbooks", type: "markdown", lastModified: "2026-05-16", status: "Indexed", sensitivity: "Internal", acl: ["Platform Operators"], pageIds: ["wiki-ingestion-pipeline"] },
     { id: "src-password-vendor", title: "Vendor Security Addendum.pdf", owner: "Legal", location: "OneDrive / Legal / Vendors", type: "pdf", lastModified: "2026-05-12", status: "Password Protected", sensitivity: "Restricted", acl: ["Legal Restricted"], pageIds: [] },
     { id: "src-new-hire-guide", title: "New Hire Guide.pdf", owner: "People Experience", location: "OneDrive / People / Onboarding", type: "pdf", lastModified: "2026-05-15", status: "Queued", sensitivity: "Internal", acl: ["All Employees"], pageIds: ["wiki-new-hire-onboarding"] }
+  ],
+  extractionExamples: [
+    {
+      id: "extract-approval-matrix",
+      pageId: "wiki-approval-matrix",
+      title: "Source-to-Wiki extraction sample",
+      scenario: "A governance update is compiled from an Excel approval matrix, a PDF classification standard, and an older PowerPoint SLA reference.",
+      sourceIds: ["src-security-approval", "src-data-classification", "src-old-approval-sla"],
+      extractedSignals: [
+        { label: "Sensitivity rule", value: "Restricted pages require data owner and security reviewer approval." },
+        { label: "Confidence signal", value: "Two sources agree on sensitive update routing; one archived deck conflicts on SLA." },
+        { label: "Conflict detected", value: "Security escalation SLA appears as 2 business days in current Excel and 5 business days in legacy PowerPoint." },
+        { label: "Permission boundary", value: "Confidential sources are limited to Security Reviewers and Compliance Office groups." }
+      ],
+      generatedMarkdown: {
+        frontMatter: [
+          "title: Sensitive Wiki Change Approval Matrix",
+          "owner: Information Security",
+          "sensitivity: Confidential",
+          "status: Needs Review",
+          "confidence: 0.74",
+          "sources: src-security-approval, src-data-classification, src-old-approval-sla"
+        ],
+        sections: [
+          { heading: "When review is required", body: "Low-confidence or sensitive LLM-generated edits must route to designated approvers before becoming visible to broad audiences." },
+          { heading: "Approval path", body: "Restricted pages require two approvers: the mapped data owner and a security reviewer. Confidential pages can be approved by the mapped owner group when confidence is at least 0.85." },
+          { heading: "Open conflict", body: "The escalation SLA is unresolved because source documents disagree between 2 business days and 5 business days. The page remains in Needs Review until Information Security confirms the authoritative value." }
+        ]
+      },
+      validationPoints: [
+        "Confirm whether the customer wants to show extracted snippets, source metadata, or both in the generated Wiki page.",
+        "Confirm if conflicting source values should block publishing or publish with a visible warning.",
+        "Confirm which source ACL should govern a Wiki page compiled from mixed-permission documents."
+      ]
+    },
+    {
+      id: "extract-travel-policy",
+      pageId: "wiki-travel-expense",
+      title: "Published policy extraction sample",
+      scenario: "Finance policy and FAQ content are compiled into a reviewed employee-facing travel policy page.",
+      sourceIds: ["src-expense-policy", "src-travel-faq", "src-finance-q2"],
+      extractedSignals: [
+        { label: "Policy threshold", value: "Flights above policy threshold require manager approval before booking." },
+        { label: "Employee action", value: "Standard travel expenses must be submitted within 30 days." },
+        { label: "Review status", value: "Finance Operations approved the generated wording on May 13." }
+      ],
+      generatedMarkdown: {
+        frontMatter: [
+          "title: Travel and Expense Policy",
+          "owner: Finance Operations",
+          "sensitivity: Internal",
+          "status: Published",
+          "confidence: 0.96",
+          "sources: src-expense-policy, src-travel-faq, src-finance-q2"
+        ],
+        sections: [
+          { heading: "Expense submission", body: "Employees can submit standard travel expenses within 30 days of the trip or purchase date." },
+          { heading: "Pre-approval", body: "Flights above the configured policy threshold require manager approval before booking." },
+          { heading: "International travel", body: "International travel requires cost center approval and additional security review for high-risk destinations." }
+        ]
+      },
+      validationPoints: [
+        "Confirm whether policy thresholds should be displayed as exact values once production source documents are available.",
+        "Confirm whether employee-facing pages should hide internal extraction confidence details."
+      ]
+    }
   ],
   ingestJobs: [
     { id: "job-8192", file: "New Hire Guide.pdf", owner: "People Experience", stage: "OCR extraction", status: "Running", queueAge: "12 min", updated: "2026-05-16 10:18", warning: "Large scanned PDF; Document Intelligence route selected." },

@@ -54,6 +54,7 @@ Mock data checklist:
 - Include multiple realistic records for each important business entity, not only one happy-path item.
 - Include varied statuses, owners, dates, categories, priorities, metrics, tags, relationships, and edge cases where relevant.
 - Include enough data to make search, filtering, sorting, selection, dashboards, detail panels, and status changes meaningful.
+- Include at least one explicit data-source-to-Wiki example that shows source records/documents, extracted signals or fields, generated Wiki content, citations, metadata, and validation questions.
 - Include at least one empty-state scenario and one simulated error or warning scenario when relevant to the workflow.
 - Use domain-appropriate names and values inferred from the requirements. If the domain is unclear, state assumptions and create neutral but realistic sample data.
 
@@ -68,6 +69,7 @@ Interaction checklist:
 - Navigation between major screens or workflow steps
 - Search, filter, sort, and clear-filter behavior over mock data
 - Select a record and show a data-driven detail view
+- Inspect a generated Wiki page or page preview and trace visible content back to source records, extracted facts, citations, and confidence metadata.
 - Trigger a representative business action, then update the visible mock state
 - Show confirmation, success, warning, empty, and validation states
 - Display computed metrics, counters, summaries, or status indicators from mock data
@@ -127,6 +129,7 @@ The implementation must:
 - Generate or update code in `src/prototype`
 - Include mock data that supports realistic interactive scenarios
 - Use mock data to render tables, cards, counters, detail views, workflow states, and simulated actions
+- Include a visible example Wiki page or page preview generated from extracted mock source data, with traceable citations back to the sources
 - Avoid backend dependencies unless clearly required and sufficiently specified
 - Mark unresolved assumptions, missing dependencies, and customer validation questions clearly
 - Include concise run instructions if the prototype requires a local server

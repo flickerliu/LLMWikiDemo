@@ -27,6 +27,7 @@ const state = {
 
 const navItems = [
   ["overview", "Overview"],
+  ["pages", "Wiki Pages"],
   ["wiki", "Wiki Search"],
   ["ask", "Q&A"],
   ["ingest", "Ingestion"],
@@ -60,6 +61,10 @@ function pageById(id) {
 
 function approvalById(id) {
   return state.approvals.find(approval => approval.id === id) || state.approvals[0];
+}
+
+function extractionByPageId(pageId) {
+  return mockData.extractionExamples.find(example => example.pageId === pageId);
 }
 
 function pct(value) {
@@ -151,7 +156,8 @@ function renderOverview() {
         <div class="section-title"><h3>Current validation page</h3>${badge(selected.status, statusTone[selected.status])}</div>
         ${pageSummary(selected)}
         <div class="split-line"></div>
-        <button class="primary" data-action="nav" data-view="wiki">Inspect page detail</button>
+        <button class="primary" data-action="nav" data-view="pages">Open Wiki Pages</button>
+        <button data-action="nav" data-view="wiki">Inspect page detail</button>
         <button data-action="nav" data-view="governance">Review approvals (${pending.length})</button>
       </div>
     </section>
@@ -232,6 +238,45 @@ function renderWiki() {
   `);
 }
 
+function renderWikiPages() {
+  const selected = pageById(state.selectedPageId);
+  const extraction = extractionByPageId(selected.id);
+  const pagesWithExamples = state.pages.filter(page => extractionByPageId(page.id)).length;
+
+  return shell(`
+    ${pageHeader("Wiki pages", "Dedicated view for generated Wiki pages. Select a page to inspect its generated content, source citations, extracted signals, and customer validation questions.", `<button data-action="nav" data-view="ingest">View ingestion source data</button><button data-action="nav" data-view="wiki">Search all pages</button>`)}
+    <section class="grid two">
+      <div class="panel">
+        <div class="section-title"><h3>Generated page catalog</h3>${badge(`${pagesWithExamples} source-to-Wiki samples`, "blue")}</div>
+        <table>
+          <thead><tr><th>Wiki page</th><th>Status</th><th>Sources</th><th>Sample</th></tr></thead>
+          <tbody>${state.pages.map(page => {
+            const pageExtraction = extractionByPageId(page.id);
+            return `<tr class="clickable ${state.selectedPageId === page.id ? "selected" : ""}" data-action="select-page" data-id="${page.id}" data-next="pages">
+              <td><strong>${escapeHtml(page.title)}</strong><br><span class="muted small">${escapeHtml(page.domain)} / ${escapeHtml(page.owner)}</span></td>
+              <td>${badge(page.status, statusTone[page.status])}</td>
+              <td>${page.sourceCount}</td>
+              <td>${pageExtraction ? badge("Source trace", "good") : badge("Page only", "")}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div>
+      <aside class="detail-panel wiki-page-panel">
+        <div class="section-title"><h3>${escapeHtml(selected.title)}</h3>${badge(selected.status, statusTone[selected.status])}</div>
+        ${pageSummary(selected)}
+        ${extraction ? renderExtractionExample(extraction) : `
+          <div class="split-line"></div>
+          <div class="empty-box"><strong>No source-to-Wiki sample for this page yet.</strong><br>Select Travel and Expense Policy or Sensitive Wiki Change Approval Matrix to inspect a full source extraction example.</div>
+          <h3>Generated page sections</h3>
+          <ul class="detail-list">${selected.sections.map(section => `<li>${escapeHtml(section)}</li>`).join("")}</ul>
+          <h3>Source citations</h3>
+          <div class="badge-row">${selected.citations.map(id => badge(sourceTitle(id), "blue")).join("")}</div>
+        `}
+      </aside>
+    </section>
+  `);
+}
+
 function renderPageTable(pages) {
   return `
     <table>
@@ -252,6 +297,7 @@ function renderPageTable(pages) {
 }
 
 function renderPageDetail(page) {
+  const extraction = extractionByPageId(page.id);
   if (state.editing) {
     return `
       <aside class="detail-panel">
@@ -279,10 +325,39 @@ function renderPageDetail(page) {
       <ul class="detail-list">${page.sections.map(section => `<li>${escapeHtml(section)}</li>`).join("")}</ul>
       <h3>Source citations</h3>
       <div class="badge-row">${page.citations.map(id => badge(sourceTitle(id), "blue")).join("")}</div>
+      ${extraction ? renderExtractionExample(extraction) : ""}
       <div class="split-line"></div>
       <button data-action="edit-metadata">Edit metadata</button>
       <button class="primary" data-action="request-review" data-id="${page.id}">Request review</button>
     </aside>
+  `;
+}
+
+function renderExtractionExample(example) {
+  return `
+    <div class="split-line"></div>
+    <div class="section-title"><h3>${escapeHtml(example.title)}</h3>${badge("Mock extraction", "blue")}</div>
+    <p>${escapeHtml(example.scenario)}</p>
+    <div class="source-map">
+      <div>
+        <h4>Source documents</h4>
+        <div class="source-list">
+          ${example.sourceIds.map(id => {
+            const source = state.sourceDocuments.find(item => item.id === id);
+            return source ? `<div class="source-chip"><strong>${escapeHtml(source.title)}</strong><span>${escapeHtml(source.type)} / ${escapeHtml(source.sensitivity)} / ${escapeHtml(source.status)}</span></div>` : `<div class="source-chip"><strong>${escapeHtml(id)}</strong><span>External mock source</span></div>`;
+          }).join("")}
+        </div>
+        <h4>Extracted signals</h4>
+        <ul class="detail-list">${example.extractedSignals.map(signal => `<li><strong>${escapeHtml(signal.label)}:</strong> ${escapeHtml(signal.value)}</li>`).join("")}</ul>
+      </div>
+      <div class="wiki-preview">
+        <h4>Generated Markdown preview</h4>
+        <pre>${escapeHtml(example.generatedMarkdown.frontMatter.join("\n"))}</pre>
+        ${example.generatedMarkdown.sections.map(section => `<article><strong>## ${escapeHtml(section.heading)}</strong><p>${escapeHtml(section.body)}</p></article>`).join("")}
+      </div>
+    </div>
+    <h4>Customer validation points</h4>
+    <ul class="detail-list">${example.validationPoints.map(point => `<li>${escapeHtml(point)}</li>`).join("")}</ul>
   `;
 }
 
@@ -336,7 +411,7 @@ function renderQaResult() {
 
 function renderIngest() {
   return shell(`
-    ${pageHeader("OneDrive ingestion", "Validate how operators inspect delta jobs, extraction status, warnings, and retries for Office, PDF, Markdown, and protected files.", `<button class="primary" data-action="run-delta">Run delta sync</button>`)}
+    ${pageHeader("OneDrive ingestion", "Validate how operators inspect delta jobs, extraction status, warnings, and retries for Office, PDF, Markdown, and protected files.", `<button class="primary" data-action="run-delta">Run delta sync</button><button data-action="nav" data-view="pages">Open generated Wiki pages</button>`) }
     <section class="grid two">
       <div class="panel">
         <div class="section-title"><h3>Pipeline jobs</h3>${badge(`${state.ingestJobs.length} jobs`, "blue")}</div>
@@ -451,6 +526,7 @@ function renderOperations() {
 function render() {
   const views = {
     overview: renderOverview,
+    pages: renderWikiPages,
     wiki: renderWiki,
     ask: renderAsk,
     ingest: renderIngest,

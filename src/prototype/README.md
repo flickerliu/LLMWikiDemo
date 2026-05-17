@@ -27,7 +27,9 @@ Out of scope: production authentication, real RBAC enforcement, network calls, f
 ## Key User Flows Represented
 
 - Operator starts or inspects a OneDrive delta ingestion job.
+- Presenter opens the left-nav Wiki Pages view to inspect generated Wiki pages and their source extraction traces.
 - Knowledge manager searches Wiki pages, reviews generated content, edits metadata, and requests human review.
+- Stakeholders inspect a source-to-Wiki example showing extracted source signals, generated Markdown, citations, and validation questions.
 - Employee asks a Wiki-grounded question and receives citations or a permission-trimmed warning.
 - Security or compliance reviewer approves or rejects a sensitive generated update.
 - Operations reviewer checks audit events and LLM model-routing cost guardrails.
@@ -36,6 +38,7 @@ Out of scope: production authentication, real RBAC enforcement, network calls, f
 
 - `wikiPages`: generated Wiki pages with status, owner, sensitivity, confidence, freshness, tags, citations, warnings, history, and metrics.
 - `sourceDocuments`: OneDrive source documents with type, location, ACL group examples, processing status, and page relationships.
+- `extractionExamples`: source-to-Wiki examples that show source documents, extracted signals, generated Markdown preview, and customer validation points.
 - `ingestJobs`: pipeline jobs that show OCR, quality gate, completion, failure, and retry scenarios.
 - `approvals`: governance queue items with proposed diffs, approvers, priorities, and due dates.
 - `auditEvents` and `costDays`: operational evidence for access decisions, warnings, and LLM spend.
