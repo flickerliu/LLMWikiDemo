@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 # Enterprise LLM Wiki - Copilot Workspace
 
 这是一个用于企业级 LLM Wiki 方案设计、任务拆解、估算与客户演示的 GitHub Copilot 工作区。
+=======
+# LLMWiki Template Pack
+
+这是一套以LLMWiki系统为样例，面向企业项目的 GitHub Copilot 模板包，覆盖以下环节：
+>>>>>>> affdbb6e4a077384002de33b60fab086b4feecde
 
 当前仓库已经包含从研究、需求、方案、backlog、估算到演示页的完整骨架。
 
