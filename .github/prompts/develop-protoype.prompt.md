@@ -1,41 +1,132 @@
 ---
-description: Generate interactive prototype UI code for customer demos and requirement validation
+description: "Use when: generating a mock-data-driven interactive prototype UI for customer demos and requirement validation."
 name: develop-protoype
-agent: Plan
-argument-hint: requirements, solution design, feature backlog, target users, brand constraints, demo goals. If the input is incomplete or ambiguous, explicitly state assumptions and proceed with the safest prototype-first interpretation.
+agent: "agent"
+argument-hint: "requirements, solution design, feature backlog, target users, brand constraints, demo goals. If one or more core inputs are missing, state assumptions and generate at least one end-to-end workflow with mock data, list/detail views, and one simulated action."
 ---
-Create a **system prototype UI implementation** that is suitable for customer demos, stakeholder walkthroughs, and requirement confirmation.
 
-Requirements:
-1. Use the provided inputs to infer the product's core workflows, screens, and user interactions.
-2. Generate a prototype that is **interactive** and visually polished, but clearly scoped as a demo-ready prototype rather than production code.
-3. Prefer a user journey that covers the most important end-to-end scenarios from the requirements, solution design, and feature backlog.
-4. If the input is incomplete or ambiguous, list **Clarifications Needed** at the top, then continue with explicit assumptions.
-5. Optimize for customer validation: the UI should make it easy to confirm navigation, states, empty/error/loaded views, and key business flows.
-6. Include realistic mock data and simulated interactions where needed, but avoid backend dependencies unless they are already clearly defined in the input.
-7. Produce code that is easy to run, inspect, and present in a workshop or demo setting.
-8. If the best implementation approach is unclear, choose a lightweight, modern web prototype that can be delivered quickly and iterated on.
-9. Keep the scope aligned to the selected features; do not expand into unrelated capabilities.
-10. Highlight any trade-offs, assumptions, and gaps that should be validated with the customer.
+Create a **mock-data-driven interactive system prototype UI** for customer demos, stakeholder walkthroughs, and requirement confirmation.
 
-Recommended output structure:
+The prototype must feel like a realistic functional scenario demo, not a static screen mockup. It must use representative sample data to drive visible screens, user flows, state changes, filters, detail views, and simulated business actions.
+
+## Objective
+
+Generate a lightweight, demo-ready UI implementation that helps customers validate:
+
+- Whether the core business workflows are correct
+- Whether users can navigate and complete the most important scenarios
+- Whether information architecture, data fields, status labels, and interaction behavior match expectations
+- Whether missing requirements, unclear rules, or workflow gaps can be discussed during the demo
+
+## Scope
+
+In scope:
+
+- Interactive frontend prototype code in `src/prototype`
+- Realistic mock data that represents the target business domain
+- Simulated user interactions and state transitions backed by mock data
+- Loaded, empty, error, selected, editing, confirmation, and result states where relevant
+- A coherent end-to-end demo journey across the most important workflows
+- Supporting notes that explain assumptions, trade-offs, and validation points
+
+Out of scope:
+
+- Production backend services
+- Real authentication, authorization, persistence, or network integrations
+- Unrequested features outside the provided requirements, solution design, or backlog
+- Pixel-perfect implementation unless brand or design constraints are provided
+
+## Priority Order
+
+1. **Primary:** infer the most important workflows, screens, roles, entities, data fields, and user interactions from the provided inputs.
+2. **Secondary:** implement the prototype so every major screen and interaction is powered by realistic mock data instead of hard-coded static page text.
+3. **Tertiary:** make the prototype visually polished, easy to run, and suitable for customer-facing demos and workshop validation.
+
+If workflow validation and mock data realism conflict, favor workflow validation. Use simpler but coherent sample data, then mark any realism gaps for customer review.
+
+## Mock Data Requirements
+
+The prototype must include representative mock data that is rich enough to demonstrate realistic scenarios.
+
+Mock data checklist:
+
+- Store sample data separately from UI rendering logic, preferably in `src/prototype/mock-data.js` unless the existing prototype structure uses a different pattern.
+- Include multiple realistic records for each important business entity, not only one happy-path item.
+- Include varied statuses, owners, dates, categories, priorities, metrics, tags, relationships, and edge cases where relevant.
+- Include enough data to make search, filtering, sorting, selection, dashboards, detail panels, and status changes meaningful.
+- Include at least one empty-state scenario and one simulated error or warning scenario when relevant to the workflow.
+- Use domain-appropriate names and values inferred from the requirements. If the domain is unclear, state assumptions and create neutral but realistic sample data.
+
+Mock data must drive the UI behavior. Do not create a prototype where cards, tables, counters, charts, or detail pages are disconnected from the sample data.
+
+## Interaction Requirements
+
+Implement realistic simulated interactions using frontend state.
+
+Interaction checklist:
+
+- Navigation between major screens or workflow steps
+- Search, filter, sort, and clear-filter behavior over mock data
+- Select a record and show a data-driven detail view
+- Trigger a representative business action, then update the visible mock state
+- Show confirmation, success, warning, empty, and validation states
+- Display computed metrics, counters, summaries, or status indicators from mock data
+- Preserve a coherent demo flow so the presenter can tell an end-to-end story
+
+Actions may be simulated in memory. Do not call real APIs unless the input explicitly requires a backend and provides enough integration detail.
+
+## Implementation Guidance
+
+- Prefer a single coherent web prototype experience over fragmented partial pages.
+- Use the existing repository patterns and `src/prototype` structure when available.
+- If the implementation approach is unclear, choose a lightweight HTML/CSS/JavaScript prototype that can run locally without build tooling.
+- Keep code easy to inspect, present, and iterate during a workshop.
+- Make UI text concrete and business-facing. Avoid placeholder copy like "Lorem ipsum" or unexplained generic labels.
+- Keep scope aligned to selected features and the demo goal.
+- Do not build unrelated capabilities simply because they are easy to add.
+
+## Handling Incomplete Input
+
+If input is incomplete or ambiguous:
+
+1. Add **Clarifications Needed** at the top of the response.
+2. State explicit assumptions.
+3. Proceed with a minimal, functional prototype that includes at least one end-to-end workflow, one mock data model, one list or dashboard view, one detail view, and one simulated business action.
+4. Mark every assumption or unresolved dependency that should be confirmed with the customer.
+
+If no files or inline context are provided, generate a generic but runnable demo prototype template and clearly list the missing requirement inputs.
+
+## Recommended Output Structure
+
 - Short summary of what the prototype covers
 - Clarifications Needed, if any
 - Assumptions
+- Scope / Out of Scope
 - Key user flows represented in the prototype
+- Mock data model and example scenarios represented
 - Implementation notes
-- Generated UI code
+- Generated or updated files
 - Validation checklist for customer review
+- Risks, trade-offs, and gaps to confirm
 
-Input:
+## Input
+
 - Requirements: attach `docs/requirements.md`
 - Solution Design: attach `docs/solution-design.md`
 - Feature Backlog: attach `docs/backlogs.md`
 - If files are not attached, use inline context for the same three inputs:
-${input:context:Paste the requirements summary, solution design summary, and feature backlog items}
 
-Output:
-- Generate the prototype UI code and supporting notes needed for a customer-facing demo.
-- Prefer a single coherent prototype experience over fragmented partial pages.
-- Mark any unresolved assumption or missing dependency clearly so the customer can confirm it.
-- Generate the protocodes on the directory `docs/prototype`
+${input:context:Paste the requirements summary, solution design summary, feature backlog items, target users, demo goals, and any brand or UX constraints}
+
+## Output
+
+Generate the prototype UI code and supporting notes needed for a customer-facing demo.
+
+The implementation must:
+
+- Generate or update code in `src/prototype`
+- Include mock data that supports realistic interactive scenarios
+- Use mock data to render tables, cards, counters, detail views, workflow states, and simulated actions
+- Avoid backend dependencies unless clearly required and sufficiently specified
+- Mark unresolved assumptions, missing dependencies, and customer validation questions clearly
+- Include concise run instructions if the prototype requires a local server
