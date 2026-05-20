@@ -142,7 +142,31 @@ Use one **Delivery Mode** per task to avoid overestimating AI-led tasks:
 [2–3 sentence narrative: which task categories yield the most AI savings, which tools drive the biggest reductions, and any caveats on AI savings realisation (e.g., team AI proficiency, tooling procurement, prompt quality).]
 
 ## Epic / Feature / Task Breakdown
-[Structured table or nested bullets per task with all fields from Requirement 2, including Delivery Mode and the three human-effort fields]
+
+> **Source of truth**: Every task listed below MUST map 1:1 to a work item in `docs/backlogs.md` (same Epic → Feature → Task hierarchy, same task ID/title, same scope). Effort numbers, complexity, and AI assistance assumptions MUST be consistent with the backlog. If the backlog is missing a task referenced here, flag it under **Top unknowns** and do not invent new scope.
+>
+> **Grouping rule**: Split all tasks into the two tables below by **Delivery Mode**. Each task appears in exactly one table. The **Role Summary Table** and **AI Savings Summary** above MUST be aggregated directly from the rows in these two tables (sum per role, per AI Level, and overall) — totals must reconcile.
+
+### Table A — Human-led (AI-assisted) Tasks
+[Tasks where humans perform most implementation; AI accelerates selected steps. Human-Adjusted Likely = Likely × (1 − AI Savings %).]
+
+| Epic | Feature | Task ID | Task | Primary Role | Supporting Roles | Complexity | Optimistic (d) | Likely Gross (d) | Pessimistic (d) | Risk Buffer % | AI Level | AI Tools | AI Savings % | Human-Adjusted Likely (d) | Dependencies | Assumptions | ⚠️ Review? |
+|------|---------|---------|------|--------------|------------------|------------|----------------|------------------|-----------------|---------------|----------|----------|--------------|---------------------------|--------------|-------------|------------|
+| ...  | ...     | ...     | ...  | PM/Arch/Cons | ...              | S/M/L/XL   | X              | X                | X               | X%            | None/Low/Med/High | ... | X%   | X                         | ...          | ...         | Yes/No     |
+| **Subtotal — Human-led** |   |   |   |   |   |   | **ΣX** | **ΣX** | **ΣX** |   |   |   | **ΣX** | **ΣX** |   |   |   |
+
+### Table B — AI-led (Human-reviewed) Tasks
+[Tasks where AI generates most deliverables; humans validate and rework. Human-Adjusted Likely = Human implementation + Human review + Human rework contingency. Keep AI Savings in the 65–85% band unless justified.]
+
+| Epic | Feature | Task ID | Task | Primary Role | Supporting Roles | Complexity | Optimistic (d) | Likely Gross (d) | Pessimistic (d) | Risk Buffer % | AI Level | AI Tools | AI Savings % | Human Impl (d) | Human Review (d) | Human Rework (d) | Human-Adjusted Likely (d) | Dependencies | Assumptions | ⚠️ Review? |
+|------|---------|---------|------|--------------|------------------|------------|----------------|------------------|-----------------|---------------|----------|----------|--------------|----------------|------------------|------------------|---------------------------|--------------|-------------|------------|
+| ...  | ...     | ...     | ...  | PM/Arch/Cons | ...              | S/M/L/XL   | X              | X                | X               | X%            | Med/High | ...      | X%           | X              | X                | X                | X                         | ...          | ...         | Yes/No     |
+| **Subtotal — AI-led** |   |   |   |   |   |   | **ΣX** | **ΣX** | **ΣX** |   |   |   |   | **ΣX** | **ΣX** | **ΣX** | **ΣX** |   |   |   |
+
+### Reconciliation Check
+- Sum of Human-Adjusted Likely across Table A + Table B **MUST equal** the Total Human-Adjusted Likely in the Role Summary Table.
+- Per-role and per-AI-Level aggregates in the Role Summary Table and AI Savings Summary **MUST be derived** by grouping rows from Table A + Table B.
+- If any backlog work item from `docs/backlogs.md` is not represented in Table A or Table B, list it under **Top unknowns**.
 
 ## Estimation Risks & Unknowns
 [Risks + unknowns + management note]
