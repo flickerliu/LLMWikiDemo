@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Enterprise LLM Wiki - Copilot Workspace
 
 这是一个用于企业级 LLM Wiki 方案设计、任务拆解、估算与客户演示的 GitHub Copilot 工作区。
